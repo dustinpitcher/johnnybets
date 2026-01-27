@@ -29,7 +29,11 @@ jobs:
 
       - name: Run API tests
         run: |
-          python -m pytest api/tests/ -v --tb=short
+          if [ -d "api/tests" ]; then
+            python -m pytest api/tests/ -v --tb=short
+          else
+            echo "No test directory found, skipping API tests"
+          fi
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 

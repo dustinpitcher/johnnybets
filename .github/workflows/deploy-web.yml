@@ -39,24 +39,7 @@ jobs:
         working-directory: ./web
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          # Create _prisma_migrations table if it doesn't exist and baseline
-          npx prisma db execute --schema=prisma/schema.prisma --stdin <<'SQL' || true
-          CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
-            "id" VARCHAR(36) NOT NULL PRIMARY KEY,
-            "checksum" VARCHAR(64) NOT NULL,
-            "finished_at" TIMESTAMPTZ,
-            "migration_name" VARCHAR(255) NOT NULL,
-            "logs" TEXT,
-            "rolled_back_at" TIMESTAMPTZ,
-            "started_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
-            "applied_steps_count" INTEGER NOT NULL DEFAULT 0
-          );
-          INSERT INTO "_prisma_migrations" ("id", "checksum", "migration_name", "finished_at", "applied_steps_count")
-          SELECT gen_random_uuid()::text, 'baseline', '20250127191610_add_invite_system', now(), 1
-          WHERE NOT EXISTS (SELECT 1 FROM "_prisma_migrations" WHERE "migration_name" = '20250127191610_add_invite_system');
-          SQL
-          npx prisma migrate deploy
+        run: npx prisma migrate deploy
 
       - name: Login to Azure
         uses: azure/login@v2
