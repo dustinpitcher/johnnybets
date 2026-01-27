@@ -369,7 +369,7 @@ export default function Terminal({
             onKeyDown={handleKeyDown}
             placeholder={isLoading ? 'Thinking...' : 'Ask Johnny...'}
             disabled={isLoading}
-            className="flex-1 bg-transparent border-none outline-none text-terminal-text placeholder-terminal-muted font-mono resize-none min-h-[40px] max-h-[150px] overflow-y-auto py-2 leading-relaxed"
+            className="flex-1 bg-transparent border-none outline-none text-terminal-text placeholder-terminal-muted font-mono resize-none min-h-[40px] max-h-[150px] overflow-y-auto py-2 leading-relaxed text-[16px]"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
