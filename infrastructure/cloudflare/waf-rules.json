@@ -1,0 +1,112 @@
+{
+  "name": "JohnnyBets WAF Configuration",
+  "description": "Cloudflare WAF and bot protection rules for JohnnyBets",
+  
+  "bot_fight_mode": {
+    "enabled": true,
+    "super_bot_fight_mode": true,
+    "definitely_automated": "block",
+    "likely_automated": "managed_challenge",
+    "verified_bots": "allow"
+  },
+  
+  "rate_limiting_rules": [
+    {
+      "name": "API Rate Limit - General",
+      "description": "Limit general API requests",
+      "expression": "(http.request.uri.path matches \"^/api/\" and not http.request.uri.path matches \"^/api/chat/\")",
+      "action": "block",
+      "characteristics": ["ip.src"],
+      "period": 60,
+      "requests_per_period": 100,
+      "mitigation_timeout": 600
+    },
+    {
+      "name": "API Rate Limit - Chat",
+      "description": "Limit chat requests (more strict for abuse prevention)",
+      "expression": "(http.request.uri.path matches \"^/api/chat/\")",
+      "action": "managed_challenge",
+      "characteristics": ["ip.src"],
+      "period": 60,
+      "requests_per_period": 30,
+      "mitigation_timeout": 1800
+    },
+    {
+      "name": "API Rate Limit - Session Creation",
+      "description": "Limit new session creation",
+      "expression": "(http.request.uri.path eq \"/api/chat/sessions\" and http.request.method eq \"POST\")",
+      "action": "block",
+      "characteristics": ["ip.src"],
+      "period": 3600,
+      "requests_per_period": 50,
+      "mitigation_timeout": 3600
+    }
+  ],
+  
+  "firewall_rules": [
+    {
+      "name": "Block Known Bad Bots",
+      "expression": "(cf.client.bot) or (cf.threat_score gt 30)",
+      "action": "block",
+      "priority": 1
+    },
+    {
+      "name": "Challenge Suspicious Traffic",
+      "expression": "(cf.threat_score gt 10 and cf.threat_score le 30)",
+      "action": "managed_challenge",
+      "priority": 2
+    },
+    {
+      "name": "Block Empty User Agents",
+      "expression": "(http.user_agent eq \"\")",
+      "action": "block",
+      "priority": 3
+    },
+    {
+      "name": "Block API Abuse Patterns",
+      "expression": "(http.request.uri.path matches \"^/api/\" and http.request.headers[\"content-type\"][0] ne \"application/json\" and http.request.method in {\"POST\" \"PUT\" \"PATCH\"})",
+      "action": "block",
+      "priority": 4
+    }
+  ],
+  
+  "page_rules": [
+    {
+      "target": "api.johnnybets.com/*",
+      "actions": {
+        "cache_level": "bypass",
+        "ssl": "full_strict"
+      }
+    },
+    {
+      "target": "johnnybets.com/api/*",
+      "actions": {
+        "cache_level": "bypass"
+      }
+    },
+    {
+      "target": "johnnybets.com/*",
+      "actions": {
+        "cache_level": "standard",
+        "edge_cache_ttl": 86400,
+        "browser_cache_ttl": 3600
+      }
+    }
+  ],
+  
+  "security_headers": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
+  },
+  
+  "notes": [
+    "Bot Fight Mode should be enabled in Cloudflare dashboard",
+    "Super Bot Fight Mode requires Pro plan or higher",
+    "Rate limiting rules require Cloudflare Pro or higher for custom rules",
+    "Consider adding Turnstile CAPTCHA for session creation if abuse increases"
+  ]
+}
+

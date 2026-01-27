@@ -1,0 +1,265 @@
+// JohnnyBets Database Schema
+// PostgreSQL database for users, sessions, and chat history
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// NEXTAUTH MODELS
+// =============================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  
+  // Subscription tier
+  tier          String    @default("free") // free, pro, enterprise
+  stripeCustomerId String? @unique @map("stripe_customer_id")
+  
+  // Usage tracking
+  messageCount  Int       @default(0) @map("message_count")
+  lastActiveAt  DateTime? @map("last_active_at")
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts      Account[]
+  sessions      Session[]
+  chatSessions  ChatSession[]
+  votes         ToolVote[]
+  apiKeys       UserApiKey[]
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// =============================================================================
+// CHAT MODELS
+// =============================================================================
+
+model ChatSession {
+  id          String    @id @default(cuid())
+  userId      String?   @map("user_id")
+  
+  // Session metadata
+  title       String?   // Auto-generated from first message
+  model       String?   // LLM model used
+  reasoning   String?   // Reasoning mode
+  
+  // Entity tags (teams, players mentioned)
+  entities    Json?     // Array of { type, name, logo }
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  messages    ChatMessage[]
+
+  @@index([userId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id          String    @id @default(cuid())
+  sessionId   String    @map("session_id")
+  
+  role        String    // user, assistant, system
+  content     String    @db.Text
+  
+  // Tool usage tracking
+  toolsUsed   String[]  @default([]) @map("tools_used")
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("chat_messages")
+}
+
+// =============================================================================
+// TOOL VOTING
+// =============================================================================
+
+model ToolVote {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  toolId    String   @map("tool_id")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, toolId])
+  @@map("tool_votes")
+}
+
+// =============================================================================
+// MESSAGE FEEDBACK
+// =============================================================================
+
+model MessageFeedback {
+  id          String    @id @default(cuid())
+  userId      String?   @map("user_id")
+  sessionId   String?   @map("session_id")
+  messageId   String    @map("message_id") // Client-side message ID
+  
+  type        String    // 'up' or 'down'
+  comment     String?   @db.Text
+  
+  // Context for analysis
+  messageContent String? @db.Text @map("message_content")
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([type])
+  @@map("message_feedback")
+}
+
+// =============================================================================
+// USER API KEYS (BYOK - Bring Your Own Key)
+// =============================================================================
+
+model UserApiKey {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  
+  provider    String    // kalshi, x, etc.
+  
+  // Encrypted credentials (encrypted at rest)
+  apiKey      String?   @db.Text @map("api_key")
+  apiSecret   String?   @db.Text @map("api_secret") // For providers that need secret/private key
+  
+  // Metadata
+  label       String?   // User-friendly label (e.g., "My Trading Account")
+  isActive    Boolean   @default(true) @map("is_active")
+  lastUsedAt  DateTime? @map("last_used_at")
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider]) // One key per provider per user
+  @@index([userId])
+  @@map("user_api_keys")
+}
+
+// =============================================================================
+// SUBSCRIPTIONS (Phase 3)
+// =============================================================================
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique @map("user_id")
+  
+  stripeSubscriptionId String?   @unique @map("stripe_subscription_id")
+  stripePriceId        String?   @map("stripe_price_id")
+  
+  status               String    @default("inactive") // active, canceled, past_due
+  currentPeriodStart   DateTime? @map("current_period_start")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  @@map("subscriptions")
+}
+
+// =============================================================================
+// PAYMENTS (Phase 3)
+// =============================================================================
+
+model Payment {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  
+  provider        String    // stripe, tryspeed
+  externalId      String?   @map("external_id")
+  
+  amount          Int       // Amount in cents
+  currency        String    @default("USD")
+  status          String    // pending, completed, failed, refunded
+  
+  metadata        Json?     // Additional payment data
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("payments")
+}
+
+// =============================================================================
+// USAGE ANALYTICS
+// =============================================================================
+
+model UsageEvent {
+  id          String    @id @default(cuid())
+  userId      String?   @map("user_id")
+  sessionId   String?   @map("session_id")
+  
+  event       String    // message_sent, tool_used, session_created, etc.
+  properties  Json?     // Event-specific data
+  
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("usage_events")
+}
+

@@ -1,0 +1,123 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'what-if'
+        type: choice
+        options:
+          - what-if
+          - deploy
+
+env:
+  AZURE_RESOURCE_GROUP: rg-johnnybets-${{ github.event.inputs.environment }}-eus2
+
+jobs:
+  validate:
+    name: Validate Bicep
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Validate Bicep template
+        uses: azure/arm-deploy@v2
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./infrastructure/bicep/main.bicep
+          parameters: ./infrastructure/bicep/parameters/${{ github.event.inputs.environment }}.parameters.json
+          deploymentMode: Validate
+          failOnStdErr: false
+
+  what-if:
+    name: What-If Analysis
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event.inputs.action == 'what-if' || github.event.inputs.action == 'deploy'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Run What-If
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az deployment group what-if \
+              --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+              --template-file ./infrastructure/bicep/main.bicep \
+              --parameters @./infrastructure/bicep/parameters/${{ github.event.inputs.environment }}.parameters.json \
+              --parameters dbAdminPassword=${{ secrets.DB_ADMIN_PASSWORD }} \
+              --parameters openRouterApiKey=${{ secrets.OPENROUTER_API_KEY }} \
+              --parameters oddsApiKey=${{ secrets.THE_ODDS_API_KEY }} \
+              --parameters nextAuthSecret=${{ secrets.NEXTAUTH_SECRET }}
+
+  deploy:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: what-if
+    if: github.event.inputs.action == 'deploy'
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Bicep
+        id: deploy
+        uses: azure/arm-deploy@v2
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./infrastructure/bicep/main.bicep
+          parameters: >
+            ./infrastructure/bicep/parameters/${{ github.event.inputs.environment }}.parameters.json
+            dbAdminPassword=${{ secrets.DB_ADMIN_PASSWORD }}
+            openRouterApiKey=${{ secrets.OPENROUTER_API_KEY }}
+            oddsApiKey=${{ secrets.THE_ODDS_API_KEY }}
+            nextAuthSecret=${{ secrets.NEXTAUTH_SECRET }}
+          deploymentName: johnnybets-${{ github.run_number }}
+          failOnStdErr: false
+
+      - name: Output Deployment Results
+        run: |
+          echo "## Deployment Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Registry | ${{ steps.deploy.outputs.containerRegistryLoginServer }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API FQDN | ${{ steps.deploy.outputs.containerAppFqdn }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web Hostname | ${{ steps.deploy.outputs.staticWebAppHostname }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| PostgreSQL FQDN | ${{ steps.deploy.outputs.postgresqlFqdn }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Key Vault URI | ${{ steps.deploy.outputs.keyVaultUri }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Store SWA API Key
+        if: success()
+        run: |
+          echo "Static Web App API Key has been deployed."
+          echo "Update AZURE_STATIC_WEB_APPS_API_TOKEN secret if this is a new deployment."

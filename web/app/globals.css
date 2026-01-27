@@ -1,0 +1,224 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import JetBrains Mono from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* Custom scrollbar for terminal feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #141414;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Base styles */
+html {
+  scrollbar-color: #333 #141414;
+  scrollbar-width: thin;
+}
+
+body {
+  @apply bg-terminal-bg text-terminal-text antialiased;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Terminal cursor */
+.cursor-blink::after {
+  content: '▊';
+  @apply animate-cursor-blink text-terminal-accent ml-0.5;
+}
+
+/* Message markdown styles */
+.prose-terminal {
+  @apply text-terminal-text;
+}
+
+.prose-terminal h1,
+.prose-terminal h2,
+.prose-terminal h3,
+.prose-terminal h4 {
+  @apply text-terminal-accent font-bold mt-4 mb-2;
+}
+
+.prose-terminal h1 { @apply text-xl; }
+.prose-terminal h2 { @apply text-lg; }
+.prose-terminal h3 { @apply text-base; }
+
+.prose-terminal p {
+  @apply mb-3 leading-relaxed;
+}
+
+.prose-terminal ul,
+.prose-terminal ol {
+  @apply mb-3 pl-6;
+}
+
+.prose-terminal li {
+  @apply mb-1;
+}
+
+.prose-terminal ul li::marker {
+  @apply text-terminal-accent;
+}
+
+.prose-terminal code {
+  @apply bg-terminal-surface px-1.5 py-0.5 rounded text-terminal-accent text-sm;
+}
+
+.prose-terminal pre {
+  @apply bg-terminal-surface p-4 rounded-lg overflow-x-auto mb-3;
+}
+
+.prose-terminal pre code {
+  @apply bg-transparent p-0;
+}
+
+.prose-terminal blockquote {
+  @apply border-l-4 border-terminal-accent pl-4 italic text-terminal-muted mb-3;
+}
+
+.prose-terminal table {
+  @apply w-full mb-3 border-collapse;
+}
+
+.prose-terminal th,
+.prose-terminal td {
+  @apply border border-terminal-border px-3 py-2 text-left;
+}
+
+.prose-terminal th {
+  @apply bg-terminal-surface text-terminal-accent font-semibold;
+}
+
+.prose-terminal a {
+  @apply text-terminal-accent hover:underline;
+}
+
+.prose-terminal strong {
+  @apply font-bold text-terminal-text;
+}
+
+.prose-terminal em {
+  @apply italic text-terminal-muted;
+}
+
+/* Tool usage indicator */
+.tool-indicator {
+  @apply text-terminal-warning italic text-sm;
+}
+
+/* Status badges */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+}
+
+.badge-free {
+  @apply bg-green-500/20 text-green-400 border border-green-500/30;
+}
+
+.badge-premium {
+  @apply bg-amber-500/20 text-amber-400 border border-amber-500/30;
+}
+
+.badge-roadmap {
+  @apply bg-blue-500/20 text-blue-400 border border-blue-500/30;
+}
+
+.badge-idea {
+  @apply bg-gray-500/20 text-gray-400 border border-gray-500/30;
+}
+
+/* Sport badges */
+.sport-nfl {
+  @apply bg-nfl-primary/30 text-blue-300 border border-blue-500/30;
+}
+
+.sport-nhl {
+  @apply bg-black/30 text-red-300 border border-red-500/30;
+}
+
+.sport-mlb {
+  @apply bg-mlb-primary/30 text-blue-200 border border-blue-400/30;
+}
+
+/* Scanline effect for retro feel (optional) */
+.scanlines {
+  position: relative;
+}
+
+.scanlines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.1),
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Glow effect for accents */
+.glow-green {
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+.glow-amber {
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+/* Input focus styles */
+input:focus,
+textarea:focus {
+  @apply outline-none ring-1 ring-terminal-accent;
+}
+
+/* Button styles */
+.btn {
+  @apply px-4 py-2 rounded font-medium transition-all duration-200;
+}
+
+.btn-primary {
+  @apply bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80;
+}
+
+.btn-secondary {
+  @apply bg-terminal-surface border border-terminal-border text-terminal-text hover:border-terminal-accent;
+}
+
+.btn-ghost {
+  @apply text-terminal-muted hover:text-terminal-text hover:bg-terminal-surface;
+}
+
+/* Loading dots animation */
+.loading-dots::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+

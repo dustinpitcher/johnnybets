@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "value": "prod"
+    },
+    "location": {
+      "value": "eastus2"
+    },
+    "regionCode": {
+      "value": "eus2"
+    },
+    "dbAdminUsername": {
+      "value": "jbetadmin"
+    },
+    "dbAdminPassword": {
+      "value": "REPLACE_WITH_SECURE_PASSWORD"
+    },
+    "openRouterApiKey": {
+      "value": "REPLACE_WITH_YOUR_OPENROUTER_API_KEY"
+    },
+    "oddsApiKey": {
+      "value": "REPLACE_WITH_YOUR_ODDS_API_KEY"
+    },
+    "nextAuthSecret": {
+      "value": "REPLACE_WITH_RANDOM_32_CHAR_STRING"
+    }
+  }
+}

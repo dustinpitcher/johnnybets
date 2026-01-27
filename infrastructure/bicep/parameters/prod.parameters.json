@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "value": "prod"
+    },
+    "location": {
+      "value": "eastus2"
+    },
+    "regionCode": {
+      "value": "eus2"
+    },
+    "dbAdminUsername": {
+      "value": "jbetadmin"
+    },
+    "dbAdminPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/{subscription-id}/resourceGroups/rg-johnnybets-prod-eus2/providers/Microsoft.KeyVault/vaults/kv-jbet-prod-eus2"
+        },
+        "secretName": "db-admin-password"
+      }
+    },
+    "openRouterApiKey": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/{subscription-id}/resourceGroups/rg-johnnybets-prod-eus2/providers/Microsoft.KeyVault/vaults/kv-jbet-prod-eus2"
+        },
+        "secretName": "openrouter-api-key"
+      }
+    },
+    "oddsApiKey": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/{subscription-id}/resourceGroups/rg-johnnybets-prod-eus2/providers/Microsoft.KeyVault/vaults/kv-jbet-prod-eus2"
+        },
+        "secretName": "odds-api-key"
+      }
+    },
+    "nextAuthSecret": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/{subscription-id}/resourceGroups/rg-johnnybets-prod-eus2/providers/Microsoft.KeyVault/vaults/kv-jbet-prod-eus2"
+        },
+        "secretName": "nextauth-secret"
+      }
+    }
+  }
+}
