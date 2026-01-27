@@ -69,6 +69,7 @@ jobs:
           imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
           environmentVariables: |
             OPENROUTER_API_KEY=secretref:openrouter-api-key
+            ODDS_API_KEY=secretref:odds-api-key
             THE_ODDS_API_KEY=secretref:odds-api-key
             DATABASE_URL=secretref:database-url
             BETTING_AGENT_MODEL=x-ai/grok-4.1-fast
