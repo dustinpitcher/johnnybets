@@ -24,6 +24,9 @@ python-dotenv>=1.0.0
 # Validation
 pydantic>=2.0.0
 
+# Console formatting (used by analysis tools)
+rich>=13.7.0
+
 # Kalshi API
 kalshi-python>=1.0.0
 cryptography>=41.0.0
