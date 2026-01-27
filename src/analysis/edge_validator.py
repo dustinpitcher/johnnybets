@@ -45,11 +45,27 @@ class EdgeValidation:
     warnings: List[str]
     recommendation: str  # "BET", "FADE", "PASS", "CONTRARIAN"
     confidence: str      # "HIGH", "MEDIUM", "LOW"
+    # Extended fields for enhanced validation
+    sharp_action_pct: Optional[float] = None  # % of sharp/syndicate money
+    closing_line_value: Optional[float] = None  # CLV: difference from open to current
+    is_sharp_side: bool = False  # Whether sharps are on this side
     
     def to_markdown(self) -> str:
         """Format as markdown for agent output."""
         warnings_str = "\n".join(f"  ⚠️ {w}" for w in self.warnings) if self.warnings else "  ✅ No warnings"
         signals_str = "\n".join(f"  📊 {s}" for s in self.contrarian_signals) if self.contrarian_signals else "  None"
+        
+        # Build sharp/CLV section if available
+        sharp_section = ""
+        if self.sharp_action_pct is not None or self.closing_line_value is not None:
+            sharp_section = f"""
+### Sharp Money Analysis
+| Metric | Value |
+|--------|-------|
+| Sharp Action % | {f"{self.sharp_action_pct:.0f}%" if self.sharp_action_pct else "Unknown"} |
+| Closing Line Value | {f"{self.closing_line_value:+.1f}" if self.closing_line_value else "N/A"} |
+| Sharp Side? | {"✅ YES" if self.is_sharp_side else "❌ NO"} |
+"""
         
         return f"""
 ## 🔬 Edge Validation Report
@@ -68,7 +84,7 @@ class EdgeValidation:
 | Public Side? | {"🚨 YES" if self.is_public_side else "✅ NO"} |
 | Public % | {f"{self.public_pct:.0f}%" if self.public_pct else "Unknown"} |
 | Spot Type ATS | {f"{self.spot_type_ats:.1f}%" if self.spot_type_ats else "N/A"} |
-
+{sharp_section}
 ### Contrarian Signals
 {signals_str}
 
@@ -379,6 +395,128 @@ class EdgeValidator:
             recommendation=recommendation,
             confidence=confidence,
         )
+    
+    def validate_nba_prop_edge(
+        self,
+        prop_type: str,
+        projection: float,
+        line: float,
+        is_over: bool,
+        juice: int,
+        sample_size: int,
+        public_pct: Optional[float] = None,
+        sharp_action_pct: Optional[float] = None,
+        closing_line_value: Optional[float] = None,
+    ) -> EdgeValidation:
+        """
+        Validate an NBA player prop bet with enhanced sharp money analysis.
+        
+        Args:
+            prop_type: Type of prop (e.g., "PTS", "AST", "REB")
+            projection: Our calculated projection
+            line: The betting line
+            is_over: True if betting OVER
+            juice: The juice
+            sample_size: Number of games in our sample
+            public_pct: % of public money on this side
+            sharp_action_pct: % of sharp/syndicate money on this side
+            closing_line_value: Difference from open line (positive = line moved in our favor)
+            
+        Returns:
+            EdgeValidation with all checks including sharp analysis
+        """
+        warnings = []
+        contrarian_signals = []
+        
+        required_hit_rate = self.calculate_breakeven(juice)
+        
+        # Calculate edge based on projection vs line
+        if is_over:
+            edge_pct = ((projection - line) / line) * 100
+        else:
+            edge_pct = ((line - projection) / line) * 100
+        
+        # Rough hit rate estimate: 50% + edge/2
+        calculated_hit_rate = 50.0 + (edge_pct / 2)
+        calculated_hit_rate = max(0, min(100, calculated_hit_rate))
+        
+        has_edge = calculated_hit_rate > required_hit_rate
+        
+        # Sample size warning
+        if sample_size < 10:
+            warnings.append(f"Small sample size ({sample_size} games) - projection may be unreliable")
+        
+        # Edge magnitude check
+        if abs(edge_pct) < 5:
+            warnings.append(f"Edge ({edge_pct:+.1f}%) is too small to overcome variance")
+        
+        # Public side detection
+        is_public_side = False
+        if public_pct and public_pct > 60:
+            is_public_side = True
+            warnings.append(f"This is the PUBLIC side ({public_pct:.0f}% of bets)")
+        
+        # Sharp action analysis
+        is_sharp_side = False
+        if sharp_action_pct is not None:
+            if sharp_action_pct > 60:
+                is_sharp_side = True
+                contrarian_signals.append(f"SHARP MONEY ALERT: {sharp_action_pct:.0f}% of sharp action on this side")
+            elif sharp_action_pct < 40:
+                warnings.append(f"Sharps are FADING this side ({100 - sharp_action_pct:.0f}% sharp action against)")
+        
+        # CLV analysis - positive CLV indicates line moved in our favor (sharp validation)
+        if closing_line_value is not None:
+            if closing_line_value > 0.5:
+                contrarian_signals.append(f"Positive CLV (+{closing_line_value:.1f}) - sharps validated this move")
+                is_sharp_side = True
+            elif closing_line_value < -0.5:
+                warnings.append(f"Negative CLV ({closing_line_value:.1f}) - line moved against us")
+        
+        # Public vs Sharp divergence - powerful signal
+        if public_pct and sharp_action_pct:
+            if public_pct > 65 and sharp_action_pct < 40:
+                contrarian_signals.append("PUBLIC/SHARP SPLIT: Public heavy but sharps fading = FADE signal")
+            elif public_pct < 40 and sharp_action_pct > 60:
+                contrarian_signals.append("SHARP CONTRARIAN: Public light but sharps loading = BET signal")
+        
+        # Determine recommendation with enhanced logic
+        if is_sharp_side and has_edge and sample_size >= 10 and abs(edge_pct) >= 5:
+            recommendation = "BET"
+            confidence = "HIGH"
+        elif has_edge and sample_size >= 10 and abs(edge_pct) >= 8:
+            recommendation = "BET"
+            confidence = "HIGH" if edge_pct > 15 else "MEDIUM"
+        elif has_edge and abs(edge_pct) >= 5:
+            if is_public_side and not is_sharp_side:
+                recommendation = "CAUTION"  # Edge exists but public side without sharp confirmation
+                confidence = "LOW"
+            else:
+                recommendation = "BET"
+                confidence = "LOW"
+        elif not has_edge and is_public_side and not is_sharp_side:
+            recommendation = "FADE"
+            confidence = "MEDIUM"
+        else:
+            recommendation = "PASS"
+            confidence = "LOW" if has_edge else "MEDIUM"
+        
+        return EdgeValidation(
+            has_mathematical_edge=has_edge,
+            calculated_hit_rate=calculated_hit_rate,
+            required_hit_rate=required_hit_rate,
+            edge_pct=edge_pct,
+            is_public_side=is_public_side,
+            public_pct=public_pct,
+            contrarian_signals=contrarian_signals,
+            spot_type_ats=None,
+            warnings=warnings,
+            recommendation=recommendation,
+            confidence=confidence,
+            sharp_action_pct=sharp_action_pct,
+            closing_line_value=closing_line_value,
+            is_sharp_side=is_sharp_side,
+        )
 
 
 # Convenience function for quick validation
@@ -390,7 +528,7 @@ def validate_bet(
     Quick validation of any bet type.
     
     Args:
-        bet_type: "spread", "total", or "prop"
+        bet_type: "spread", "total", "prop", or "nba_prop"
         **kwargs: Arguments for the specific validation method
         
     Returns:
@@ -404,6 +542,8 @@ def validate_bet(
         return validator.validate_total_edge(**kwargs)
     elif bet_type == "prop":
         return validator.validate_prop_edge(**kwargs)
+    elif bet_type == "nba_prop":
+        return validator.validate_nba_prop_edge(**kwargs)
     else:
         raise ValueError(f"Unknown bet type: {bet_type}")
 

@@ -47,6 +47,12 @@ from src.tools.mlb_data import (
     analyze_bullpen_usage as _analyze_bullpen_usage,
     get_weather_impact as _get_weather_impact,
 )
+# NBA imports
+from src.tools.nba_data import NBADataFetcher, get_nba_fetcher
+from src.tools.nba_referees import NBARefereeDatabase
+from src.analysis.nba_props import NBAPropsAnalyzer
+from src.analysis.nba_tempo import PaceTempoAnalyzer
+from src.analysis.nba_load_management import LoadManagementTracker
 
 
 # =============================================================================
@@ -590,6 +596,193 @@ def get_referee_tendencies(referee_1: str = None, referee_2: str = None) -> str:
 
 
 # =============================================================================
+# NBA TOOLS
+# =============================================================================
+
+@tool
+def analyze_nba_player_prop(
+    player_name: str,
+    position: str,
+    opponent: str,
+    prop_type: str,
+    prop_line: float,
+    pace_factor: str = "normal",
+    expected_blowout: bool = False,
+) -> str:
+    """
+    Analyze NBA player prop with DvP, pace, and game script context.
+    
+    Uses Defense vs Position (DvP) rankings, pace adjustments, usage rate,
+    game script expectations, and recent form to project player performance.
+    
+    Args:
+        player_name: Player name (e.g., "Jalen Brunson")
+        position: Position (PG, SG, SF, PF, C)
+        opponent: Opponent team abbreviation (e.g., "BOS")
+        prop_type: Type of prop (PTS, AST, REB, 3PM, PTS+REB+AST)
+        prop_line: The betting line (e.g., 28.5)
+        pace_factor: Expected pace ("fast", "slow", "normal")
+        expected_blowout: Whether blowout is expected (reduces star minutes)
+        
+    Returns:
+        JSON with projections, edge analysis, and betting recommendations
+    """
+    try:
+        analyzer = NBAPropsAnalyzer()
+        analysis = analyzer.analyze_player_prop(
+            player_name=player_name,
+            position=position,
+            opponent=opponent,
+            prop_type=prop_type,
+            prop_line=prop_line,
+            pace_factor=pace_factor,
+            expected_blowout=expected_blowout,
+        )
+        return analyzer.to_json(analysis)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@tool
+def analyze_nba_pace_tempo(
+    home_team: str,
+    away_team: str,
+    current_total: float = None,
+) -> str:
+    """
+    Analyze pace matchup and projected game total.
+    
+    Calculates projected possessions per 48, tempo edge, and total adjustment.
+    Identifies track meet (both fast) vs grind (both slow) matchups.
+    
+    Args:
+        home_team: Home team abbreviation (e.g., "SAC")
+        away_team: Away team abbreviation (e.g., "IND")
+        current_total: Current betting total (optional, for edge calculation)
+        
+    Returns:
+        JSON with pace analysis, projected total, and over/under lean
+    """
+    try:
+        analyzer = PaceTempoAnalyzer()
+        analysis = analyzer.analyze_matchup(
+            home_team=home_team,
+            away_team=away_team,
+            current_total=current_total,
+        )
+        return analyzer.to_json(analysis)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@tool
+def get_nba_load_management(
+    player_name: str,
+    team: str = None,
+    is_back_to_back: bool = False,
+    opponent: str = None,
+) -> str:
+    """
+    Get load management analysis and projected minutes for NBA player.
+    
+    Tracks rest days, back-to-back splits, fatigue index, and DNP risk.
+    Critical for prop betting when stars may sit or see reduced minutes.
+    
+    Args:
+        player_name: Player name (e.g., "LeBron James")
+        team: Team abbreviation (optional)
+        is_back_to_back: Whether this is a B2B game
+        opponent: Opponent team (optional, for context)
+        
+    Returns:
+        JSON with load profile, projected minutes, and risk assessment
+    """
+    try:
+        tracker = LoadManagementTracker()
+        analysis = tracker.analyze_load(
+            player_name=player_name,
+            team=team,
+            is_back_to_back=is_back_to_back,
+            opponent=opponent,
+        )
+        return tracker.to_json(analysis)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@tool
+def get_nba_defense_profile(team: str) -> str:
+    """
+    Get team's defensive profile with DvP rankings.
+    
+    Includes defensive rating, opponent FG%, blocks, steals, and 
+    defense vs position adjustments for prop betting.
+    
+    Args:
+        team: Team abbreviation (e.g., "BOS", "MIL")
+        
+    Returns:
+        JSON with defensive metrics and DvP by position
+    """
+    try:
+        fetcher = get_nba_fetcher()
+        profile = fetcher.get_defense_profile(team)
+        
+        if not profile:
+            return json.dumps({"status": "error", "message": f"Team not found: {team}"})
+        
+        return json.dumps({
+            "status": "success",
+            "team": profile.team,
+            "games_played": profile.games_played,
+            "def_rating": profile.def_rating,
+            "opp_pts_per_game": profile.opp_pts_per_game,
+            "opp_fg_pct": profile.opp_fg_pct,
+            "opp_3pt_pct": profile.opp_3pt_pct,
+            "blocks_per_game": profile.blocks_per_game,
+            "steals_per_game": profile.steals_per_game,
+            "style": profile.get_style(),
+            "dvp_by_position": profile.dvp_by_position,
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+@tool
+def analyze_nba_refs(referee_names: str) -> str:
+    """
+    Analyze NBA referee crew tendencies for game totals.
+    
+    Provides foul rates, FT rate, total impact, and over/under tendencies.
+    Crews like Scott Foster = under lean; whistle-happy refs = over lean.
+    
+    Args:
+        referee_names: Comma-separated referee names (e.g., "Scott Foster, Tony Brothers")
+        
+    Returns:
+        JSON with crew analysis, total lean, and foul expectations
+    """
+    try:
+        db = NBARefereeDatabase()
+        
+        # Parse referee names
+        refs = [r.strip() for r in referee_names.split(",") if r.strip()]
+        
+        if len(refs) >= 3:
+            analysis = db.analyze_crew(refs[0], refs[1], refs[2])
+        elif len(refs) == 2:
+            analysis = db.analyze_crew(refs[0], refs[1])
+        elif len(refs) == 1:
+            analysis = db.analyze_crew(refs[0])
+        else:
+            return json.dumps({"status": "error", "message": "No referee names provided"})
+        
+        return json.dumps(analysis, indent=2)
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)}, indent=2)
+
+
+# =============================================================================
 # MLB TOOLS
 # =============================================================================
 
@@ -737,25 +930,31 @@ def save_analysis_report(content: str, report_type: str = "analysis") -> str:
 # AGENT SETUP
 # =============================================================================
 
-SYSTEM_PROMPT = """You are JohnnyBets, an expert sports betting analyst assistant. You help identify arbitrage opportunities and value bets across NFL, NHL, and MLB.
+SYSTEM_PROMPT = """You are JohnnyBets, an expert sports betting analyst assistant. You help identify arbitrage opportunities and value bets across NFL, NBA, NHL, and MLB.
 
 Your capabilities:
 1. **Live Odds**: Fetch real-time odds from 10+ sportsbooks
 2. **Prediction Markets**: Access Kalshi prediction market data  
 3. **Arbitrage Scanner**: Find guaranteed profit opportunities
 4. **NFL Prop Alpha**: Contextual player prop analysis with defense profiling
-5. **NHL Goalie Alpha**: Goalie props with B2B splits and xGSV%
-6. **NHL Analytics**: Team Corsi, xG, and matchup analysis
-7. **MLB Pitcher Alpha**: K projections, IP estimates, Stuff+, pitch mix, park factors
-8. **MLB Park & Weather**: Stadium factors, wind/temp impact on totals
-9. **Bullpen Analyzer**: Relief arm availability and fatigue tracking
-10. **X/Twitter Intel**: Real-time breaking news and line movement
-11. **Edge Validator**: Anti-slop validation before recommending bets
+5. **NBA Prop Alpha**: Player props with DvP, pace adjustments, and game script splits
+6. **NBA Pace & Tempo**: Game total projections based on pace matchups
+7. **NBA Load Management**: B2B splits, fatigue index, DNP risk assessment
+8. **NBA Defense Profiles**: DvP rankings by position for prop edges
+9. **NBA Referee Tendencies**: Foul rates, FT impact, and total leans
+10. **NHL Goalie Alpha**: Goalie props with B2B splits and xGSV%
+11. **NHL Analytics**: Team Corsi, xG, and matchup analysis
+12. **MLB Pitcher Alpha**: K projections, IP estimates, Stuff+, pitch mix, park factors
+13. **MLB Park & Weather**: Stadium factors, wind/temp impact on totals
+14. **Bullpen Analyzer**: Relief arm availability and fatigue tracking
+15. **X/Twitter Intel**: Real-time breaking news and line movement
+16. **Edge Validator**: Anti-slop validation with sharp money analysis
 
 ## Key Principles
 - Always fetch fresh data before making recommendations
 - Never recommend bets on games that have started or start within 15 minutes
 - Use the Edge Validator before making final recommendations
+- For NBA props, check DvP matchups, pace factors, and load management
 - For MLB pitcher props, check K projections, recent form, and park factors
 - Distinguish signal from noise in X/Twitter data
 - Be conversational and helpful
@@ -783,6 +982,12 @@ def get_all_tools():
         get_defense_profile,
         get_player_weather_splits,
         get_player_game_script_splits,
+        # NBA
+        analyze_nba_player_prop,
+        analyze_nba_pace_tempo,
+        get_nba_load_management,
+        get_nba_defense_profile,
+        analyze_nba_refs,
         # NHL
         analyze_goalie_props,
         get_nhl_goalie_profile,
