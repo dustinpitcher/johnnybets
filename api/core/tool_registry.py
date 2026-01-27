@@ -26,6 +26,7 @@ class ToolStatus(str, Enum):
 class ToolCategory(str, Enum):
     GENERAL = "general"
     NFL = "nfl"
+    NBA = "nba"
     NHL = "nhl"
     MLB = "mlb"
 
@@ -150,11 +151,11 @@ TOOLS: Dict[str, Tool] = {
     "validate_betting_edge": Tool(
         id="validate_betting_edge",
         name="Edge Validator",
-        description="Anti-slop validator that checks for real +EV, public side warnings, historical ATS, and weather traps before recommending bets.",
+        description="Anti-slop validator that checks for real +EV, public side warnings, sharp money analysis, and CLV before recommending bets.",
         category=ToolCategory.GENERAL,
         status=ToolStatus.FREE,
         icon="shield-check",
-        sports=["nfl", "nhl", "mlb"],
+        sports=["nfl", "nba", "nhl", "mlb"],
         function_name="validate_betting_edge",
     ),
     "save_betting_strategy": Tool(
@@ -220,6 +221,60 @@ TOOLS: Dict[str, Tool] = {
         icon="chart-bar",
         sports=["nfl"],
         function_name="get_player_game_script_splits",
+    ),
+    
+    # -------------------------------------------------------------------------
+    # NBA TOOLS
+    # -------------------------------------------------------------------------
+    "analyze_nba_player_prop": Tool(
+        id="analyze_nba_player_prop",
+        name="NBA Prop Alpha",
+        description="NBA player prop analysis with Defense vs Position (DvP) rankings, pace adjustments, usage rate, game script splits, and recent form weighting.",
+        category=ToolCategory.NBA,
+        status=ToolStatus.FREE,
+        icon="basketball",
+        sports=["nba"],
+        function_name="analyze_nba_player_prop",
+    ),
+    "analyze_nba_pace_tempo": Tool(
+        id="analyze_nba_pace_tempo",
+        name="Pace & Tempo Analyzer",
+        description="Game total projections based on pace matchups. Identifies track meets (both fast) vs grinds (both slow). Totals can swing 5-10 points on pace mismatches.",
+        category=ToolCategory.NBA,
+        status=ToolStatus.FREE,
+        icon="chart-line",
+        sports=["nba"],
+        function_name="analyze_nba_pace_tempo",
+    ),
+    "get_nba_load_management": Tool(
+        id="get_nba_load_management",
+        name="Load Management Tracker",
+        description="Track rest days, B2B splits, fatigue index, and DNP risk. Critical for props when stars may sit or see reduced minutes.",
+        category=ToolCategory.NBA,
+        status=ToolStatus.FREE,
+        icon="battery-half",
+        sports=["nba"],
+        function_name="get_nba_load_management",
+    ),
+    "get_nba_defense_profile": Tool(
+        id="get_nba_defense_profile",
+        name="NBA Defense Profile",
+        description="Team defensive metrics with DvP rankings by position. Shows DEF rating, opponent FG%, blocks, steals, and style classification.",
+        category=ToolCategory.NBA,
+        status=ToolStatus.FREE,
+        icon="shield",
+        sports=["nba"],
+        function_name="get_nba_defense_profile",
+    ),
+    "analyze_nba_refs": Tool(
+        id="analyze_nba_refs",
+        name="NBA Referee Tendencies",
+        description="Referee crew foul rates, FT impact, and total leans. Some refs = unders (let them play), others = overs (whistle-happy).",
+        category=ToolCategory.NBA,
+        status=ToolStatus.FREE,
+        icon="whistle",
+        sports=["nba"],
+        function_name="analyze_nba_refs",
     ),
     
     # -------------------------------------------------------------------------
