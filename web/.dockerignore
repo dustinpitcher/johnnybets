@@ -1,0 +1,20 @@
+# Docker ignore for Next.js production builds
+
+# Ignore local development env (use .env.production instead)
+.env.local
+.env.*.local
+
+# Dependencies are installed fresh in container
+node_modules
+
+# Build output (we rebuild in container)
+.next
+out
+
+# Dev/test files
+*.log
+coverage
+
+# IDE
+.vscode
+.idea
