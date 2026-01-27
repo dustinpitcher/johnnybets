@@ -39,7 +39,11 @@ jobs:
         working-directory: ./web
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma migrate deploy
+        run: |
+          # Check if _prisma_migrations table exists and has entries
+          # If database has tables but no migration history, baseline it first
+          npx prisma migrate resolve --applied 20250127191610_add_invite_system 2>/dev/null || true
+          npx prisma migrate deploy
 
       - name: Login to Azure
         uses: azure/login@v2
