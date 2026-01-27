@@ -176,7 +176,7 @@ function SignInForm() {
                   required
                 />
                 <p className="text-xs text-terminal-muted mt-1">
-                  We're currently invite-only during beta.
+                  We&apos;re currently invite-only during beta.
                 </p>
               </div>
             </>

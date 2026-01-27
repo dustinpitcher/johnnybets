@@ -39,7 +39,10 @@ jobs:
         working-directory: ./web
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma migrate deploy
+        run: |
+          # Resolve any previously failed migrations before deploying
+          npx prisma migrate resolve --rolled-back 20260127193007_add_invite_system 2>/dev/null || true
+          npx prisma migrate deploy
 
       - name: Login to Azure
         uses: azure/login@v2

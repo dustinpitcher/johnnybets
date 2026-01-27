@@ -77,7 +77,7 @@ export default function InviteGateContent({ onClose }: InviteGateContentProps) {
       {/* Header message */}
       <div className="text-center">
         <p className="text-terminal-text text-lg mb-2">
-          We're currently in <span className="text-terminal-accent font-semibold">invite-only beta</span>.
+          We&apos;re currently in <span className="text-terminal-accent font-semibold">invite-only beta</span>.
         </p>
         <p className="text-terminal-muted text-sm">
           Join the waitlist or enter your invite code to get access.
