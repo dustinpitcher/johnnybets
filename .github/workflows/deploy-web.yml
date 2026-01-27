@@ -41,7 +41,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           # Create _prisma_migrations table if it doesn't exist and baseline
-          npx prisma db execute --stdin <<'SQL' || true
+          npx prisma db execute --schema=prisma/schema.prisma --stdin <<'SQL' || true
           CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
             "id" VARCHAR(36) NOT NULL PRIMARY KEY,
             "checksum" VARCHAR(64) NOT NULL,
