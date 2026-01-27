@@ -6,8 +6,8 @@ Azure infrastructure for JohnnyBets using Bicep templates.
 
 | Domain | Points To |
 |--------|-----------|
-| [johnnybets.ai](https://johnnybets.ai) | Static Web App (frontend) |
-| [www.johnnybets.ai](https://www.johnnybets.ai) | Static Web App (frontend) |
+| [johnnybets.ai](https://johnnybets.ai) | Container App (Web frontend) |
+| [www.johnnybets.ai](https://www.johnnybets.ai) | Container App (Web frontend) |
 | [api.johnnybets.ai](https://api.johnnybets.ai) | Container App (API) |
 
 ## Architecture
@@ -21,8 +21,9 @@ Azure infrastructure for JohnnyBets using Bicep templates.
               ┌──────────────┴──────────────┐
               │                              │
     ┌─────────▼─────────┐        ┌──────────▼──────────┐
-    │  Static Web App   │        │  Container Apps     │
-    │  (swa-jbet-web)   │───────▶│  (ca-jbet-api)      │
+    │  Container App    │        │  Container App      │
+    │  (ca-jbet-web)    │───────▶│  (ca-jbet-api)      │
+    │  Next.js Frontend │        │  FastAPI Backend    │
     └───────────────────┘        └──────────┬──────────┘
                                             │
                           ┌─────────────────┼─────────────────┐
@@ -50,8 +51,8 @@ Pattern: `{prefix}-{app}-{service}-{env}-{region}`
 | Resource Group | `rg-` | `rg-johnnybets-prod-eus2` |
 | Container Registry | `cr` | `crjohnnybets` (global) |
 | Container App Environment | `cae-` | `cae-jbet-prod-eus2` |
-| Container App | `ca-` | `ca-jbet-api-prod-eus2` |
-| Static Web App | `swa-` | `swa-jbet-web-prod-eus2` |
+| Container App (API) | `ca-` | `ca-jbet-api-prod-eus2` |
+| Container App (Web) | `ca-` | `ca-jbet-web-prod-eus2` |
 | PostgreSQL | `psql-` | `psql-jbet-prod-eus2` |
 | Key Vault | `kv-` | `kv-jbet-prod-eus2` |
 | Log Analytics | `log-` | `log-jbet-prod-eus2` |
