@@ -1,4 +1,4 @@
-name: Deploy Web to Azure Static Web Apps
+name: Deploy Web to Azure Container App
 
 on:
   push:
@@ -7,71 +7,78 @@ on:
     paths:
       - 'web/**'
       - '.github/workflows/deploy-web.yml'
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - main
-    paths:
-      - 'web/**'
   workflow_dispatch:
 
 env:
-  NODE_VERSION: '20'
-  # Custom domain
-  API_DOMAIN: api.johnnybets.ai
-  WEB_DOMAIN: johnnybets.ai
+  REGISTRY: crjohnnybets.azurecr.io
+  IMAGE_NAME: johnnybets-web
+  CONTAINER_APP: ca-jbet-web-prod-eus2
+  RESOURCE_GROUP: rg-johnnybets-prod-eus2
 
 jobs:
   build-and-deploy:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    name: Build and Deploy
+    name: Build and Deploy Web
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: true
-          lfs: false
 
-      - name: Deploy to Azure Static Web Apps
-        uses: Azure/static-web-apps-deploy@v1
+      - name: Login to Azure
+        uses: azure/login@v2
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          # Let SWA handle the build for Next.js hybrid support
-          app_location: "/web"
-          output_location: ""
-          skip_app_build: false
-        env:
-          # Production API URL
-          NEXT_PUBLIC_API_URL: https://${{ env.API_DOMAIN }}
-          # NextAuth configuration
-          NEXTAUTH_URL: https://${{ env.WEB_DOMAIN }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          # Database (optional for build)
-          SKIP_ENV_VALIDATION: "true"
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ env.REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push Docker image
+        working-directory: ./web
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy to Container App
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: ${{ env.CONTAINER_APP }}
+          imageToDeploy: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Health Check
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          
+          for i in {1..10}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://johnnybets.ai/api/auth/providers)
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i: Status $STATUS, retrying..."
+            sleep 10
+          done
+          
+          echo "Health check failed after 10 attempts"
+          exit 1
 
       - name: Deployment Summary
-        if: success() && github.event_name == 'push'
+        if: success()
         run: |
           echo "## Web Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Web URL | https://${{ env.WEB_DOMAIN }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| API URL | https://${{ env.API_DOMAIN }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-
-  close-pull-request:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    name: Close Pull Request
-    
-    steps:
-      - name: Close Pull Request
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          action: "close"
+          echo "| Container App | \`${{ env.CONTAINER_APP }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`${{ env.IMAGE_NAME }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | https://johnnybets.ai |" >> $GITHUB_STEP_SUMMARY

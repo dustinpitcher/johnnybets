@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   // Enable React strict mode
   reactStrictMode: true,
   
+  // Standalone output for Docker deployment
+  output: 'standalone',
+  
   // Configure rewrites for API proxy in development
   // Exclude Next.js API routes: auth, sessions, feedback, user
   async rewrites() {
