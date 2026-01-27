@@ -61,7 +61,7 @@ export default function Terminal({
   const [historyIndex, setHistoryIndex] = useState(-1);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const localSessionIdRef = useRef<string | null>(null);
 
   // Keep ref in sync with state
@@ -251,33 +251,48 @@ export default function Terminal({
     }
   }, [input, isLoading, apiSessionId, localSessionId, onSessionChange, isAuthenticated]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Handle up/down for command history
-    if (e.key === 'ArrowUp') {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Cmd+Enter (Mac) or Ctrl+Enter (Win/Linux)
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      if (commandHistory.length > 0) {
-        const newIndex = historyIndex < commandHistory.length - 1 
-          ? historyIndex + 1 
-          : historyIndex;
-        setHistoryIndex(newIndex);
-        setInput(commandHistory[commandHistory.length - 1 - newIndex] || '');
+      handleSubmit();
+      return;
+    }
+
+    // Handle up/down for command history (only when at start/end of input)
+    if (e.key === 'ArrowUp') {
+      // Only navigate history if cursor is at the beginning or input is empty
+      const textarea = e.currentTarget;
+      if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
+        e.preventDefault();
+        if (commandHistory.length > 0) {
+          const newIndex = historyIndex < commandHistory.length - 1 
+            ? historyIndex + 1 
+            : historyIndex;
+          setHistoryIndex(newIndex);
+          setInput(commandHistory[commandHistory.length - 1 - newIndex] || '');
+        }
       }
     } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInput(commandHistory[commandHistory.length - 1 - newIndex] || '');
-      } else {
-        setHistoryIndex(-1);
-        setInput('');
+      // Only navigate history if cursor is at the end
+      const textarea = e.currentTarget;
+      if (textarea.selectionStart === textarea.value.length) {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          const newIndex = historyIndex - 1;
+          setHistoryIndex(newIndex);
+          setInput(commandHistory[commandHistory.length - 1 - newIndex] || '');
+        } else {
+          setHistoryIndex(-1);
+          setInput('');
+        }
       }
     }
   };
 
   return (
     <div 
-      className="flex flex-col h-full bg-terminal-bg"
+      className="flex flex-col h-full bg-terminal-bg text-[0.85em]"
       onClick={() => inputRef.current?.focus()}
     >
       {/* Messages area */}
@@ -340,25 +355,54 @@ export default function Terminal({
 
       {/* Input area */}
       <form onSubmit={handleSubmit} className="border-t border-terminal-border p-4">
-        <div className="flex items-center gap-2">
-          <span className="text-terminal-accent font-bold">{'>'}</span>
-          <input
+        <div className="flex items-start gap-2">
+          <span className="text-terminal-accent font-bold mt-2">{'>'}</span>
+          <textarea
             ref={inputRef}
-            type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              // Auto-resize textarea
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+            }}
             onKeyDown={handleKeyDown}
             placeholder={isLoading ? 'Thinking...' : 'Ask Johnny...'}
             disabled={isLoading}
-            className="flex-1 bg-transparent border-none outline-none text-terminal-text placeholder-terminal-muted font-mono"
+            className="flex-1 bg-transparent border-none outline-none text-terminal-text placeholder-terminal-muted font-mono resize-none min-h-[40px] max-h-[150px] overflow-y-auto py-2 leading-relaxed"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
-            spellCheck="false"
+            spellCheck={false}
+            rows={1}
           />
-          {isLoading && (
-            <div className="w-2 h-2 bg-terminal-accent rounded-full animate-pulse" />
-          )}
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:bg-terminal-accent/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-terminal-border disabled:hover:bg-terminal-surface transition-colors"
+            aria-label="Send message"
+          >
+            {isLoading ? (
+              <div className="w-4 h-4 border-2 border-terminal-accent border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-5 h-5 text-terminal-accent"
+              >
+                <path d="M22 2L11 13" />
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+              </svg>
+            )}
+          </button>
+        </div>
+        <div className="hidden md:block text-terminal-muted text-xs mt-2 ml-6">
+          Press <kbd className="px-1.5 py-0.5 bg-terminal-surface rounded text-terminal-text">⌘</kbd>+<kbd className="px-1.5 py-0.5 bg-terminal-surface rounded text-terminal-text">Enter</kbd> to send
         </div>
       </form>
     </div>

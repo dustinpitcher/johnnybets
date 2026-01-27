@@ -187,9 +187,18 @@ body {
 }
 
 /* Input focus styles */
-input:focus,
-textarea:focus {
+input:focus {
   @apply outline-none ring-1 ring-terminal-accent;
+}
+
+/* Terminal textarea should not have ring focus */
+textarea:focus {
+  @apply outline-none;
+}
+
+/* Non-terminal textareas can have ring */
+.with-ring-focus:focus {
+  @apply ring-1 ring-terminal-accent;
 }
 
 /* Button styles */
