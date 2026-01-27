@@ -9,11 +9,15 @@ function SignInForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/';
   const errorParam = searchParams.get('error');
+  const inviteCodeParam = searchParams.get('invite');
+  const modeParam = searchParams.get('mode');
 
-  const [isSignUp, setIsSignUp] = useState(false);
+  // Default to signup mode if invite code is present
+  const [isSignUp, setIsSignUp] = useState(modeParam === 'signup' || !!inviteCodeParam);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState(inviteCodeParam || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(errorParam);
 
@@ -36,6 +40,12 @@ function SignInForm() {
       return;
     }
 
+    // Require invite code for signup
+    if (isSignUp && !inviteCode.trim()) {
+      setError('Invite code is required to create an account');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -43,6 +53,7 @@ function SignInForm() {
         email,
         password,
         action: isSignUp ? 'signup' : 'signin',
+        inviteCode: isSignUp ? inviteCode.trim().toUpperCase() : undefined,
         redirect: false,
         callbackUrl,
       });
@@ -127,25 +138,48 @@ function SignInForm() {
           </div>
 
           {isSignUp && (
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm text-terminal-muted mb-1">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg
-                         text-terminal-text placeholder-terminal-muted
-                         focus:border-terminal-accent focus:ring-1 focus:ring-terminal-accent
-                         focus:outline-none"
-                required
-                autoComplete="new-password"
-                minLength={6}
-              />
-            </div>
+            <>
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm text-terminal-muted mb-1">
+                  Confirm Password
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg
+                           text-terminal-text placeholder-terminal-muted
+                           focus:border-terminal-accent focus:ring-1 focus:ring-terminal-accent
+                           focus:outline-none"
+                  required
+                  autoComplete="new-password"
+                  minLength={6}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="inviteCode" className="block text-sm text-terminal-muted mb-1">
+                  Invite Code
+                </label>
+                <input
+                  id="inviteCode"
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  placeholder="XXXX-XXXX"
+                  className="w-full px-4 py-3 bg-terminal-bg border border-terminal-border rounded-lg
+                           text-terminal-text placeholder-terminal-muted font-mono tracking-wider
+                           focus:border-terminal-accent focus:ring-1 focus:ring-terminal-accent
+                           focus:outline-none uppercase text-[16px]"
+                  required
+                />
+                <p className="text-xs text-terminal-muted mt-1">
+                  We're currently invite-only during beta.
+                </p>
+              </div>
+            </>
           )}
 
           <button
@@ -177,23 +211,27 @@ function SignInForm() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="mt-6 text-center">
-        <Link href="/" className="text-terminal-muted hover:text-terminal-accent text-sm">
-          ← Continue without signing in
-        </Link>
-      </div>
+      {/* Footer - hide "continue without signing in" during invite-only beta */}
+      {!inviteCodeParam && (
+        <div className="mt-6 text-center">
+          <Link href="/" className="text-terminal-muted hover:text-terminal-accent text-sm">
+            ← Back to home
+          </Link>
+        </div>
+      )}
 
       <p className="mt-8 text-center text-xs text-terminal-muted">
         By signing in, you agree to our Terms of Service and Privacy Policy.
       </p>
 
-      {/* Dev note */}
-      <div className="mt-6 p-3 bg-terminal-warning/10 border border-terminal-warning/30 rounded-lg">
-        <p className="text-xs text-terminal-warning">
-          <strong>Dev Mode:</strong> Users are stored in memory. They will be lost on server restart.
-        </p>
-      </div>
+      {/* Invite-only notice */}
+      {isSignUp && (
+        <div className="mt-6 p-3 bg-terminal-accent/10 border border-terminal-accent/30 rounded-lg">
+          <p className="text-xs text-terminal-accent">
+            <strong>Invite Only:</strong> JohnnyBets is currently in private beta. You need an invite code to create an account.
+          </p>
+        </div>
+      )}
     </>
   );
 }

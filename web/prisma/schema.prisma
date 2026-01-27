@@ -55,6 +55,10 @@ model User {
   tier          String    @default("free") // free, pro, enterprise
   stripeCustomerId String? @unique @map("stripe_customer_id")
   
+  // Invite system
+  inviteCodeId  String?   @map("invite_code_id")
+  inviteCode    InviteCode? @relation("InvitedBy", fields: [inviteCodeId], references: [id])
+  
   // Usage tracking
   messageCount  Int       @default(0) @map("message_count")
   lastActiveAt  DateTime? @map("last_active_at")
@@ -261,5 +265,41 @@ model UsageEvent {
   @@index([event])
   @@index([createdAt])
   @@map("usage_events")
+}
+
+// =============================================================================
+// INVITE SYSTEM (Beta)
+// =============================================================================
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String?  // Where they heard about us (optional)
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@map("waitlist_entries")
+}
+
+model InviteCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  
+  // Usage limits
+  maxUses   Int       @default(1) @map("max_uses")
+  useCount  Int       @default(0) @map("use_count")
+  
+  // Expiration
+  expiresAt DateTime? @map("expires_at")
+  
+  // Tracking
+  createdBy String?   @map("created_by")  // Admin who created it
+  note      String?                        // e.g., "For Twitter launch"
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  
+  // Track who used this code
+  users     User[]    @relation("InvitedBy")
+  
+  @@map("invite_codes")
 }
 

@@ -7,6 +7,8 @@ import { useSession } from 'next-auth/react';
 import { createSession as createApiSession, streamMessage } from '@/lib/api';
 import * as sessionStorage from '@/lib/sessions';
 import MessageActions from './MessageActions';
+import Modal from './Modal';
+import InviteGateContent from './InviteGateContent';
 
 interface Message {
   id: string;
@@ -59,6 +61,7 @@ export default function Terminal({
   const [localSessionId, setLocalSessionId] = useState<string | null>(null);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [showInviteGate, setShowInviteGate] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -144,6 +147,12 @@ export default function Terminal({
     
     const messageText = overrideMessage || input.trim();
     if (!messageText || isLoading) return;
+
+    // Require authentication - show invite gate if not authenticated
+    if (!isAuthenticated) {
+      setShowInviteGate(true);
+      return;
+    }
 
     // Add to command history
     setCommandHistory(prev => [...prev, messageText]);
@@ -405,6 +414,16 @@ export default function Terminal({
           Press <kbd className="px-1.5 py-0.5 bg-terminal-surface rounded text-terminal-text">⌘</kbd>+<kbd className="px-1.5 py-0.5 bg-terminal-surface rounded text-terminal-text">Enter</kbd> to send
         </div>
       </form>
+
+      {/* Invite Gate Modal */}
+      <Modal
+        isOpen={showInviteGate}
+        onClose={() => setShowInviteGate(false)}
+        title="Join JohnnyBets"
+        size="sm"
+      >
+        <InviteGateContent onClose={() => setShowInviteGate(false)} />
+      </Modal>
     </div>
   );
 }

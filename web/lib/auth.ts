@@ -43,6 +43,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email', placeholder: 'you@example.com' },
         password: { label: 'Password', type: 'password' },
         action: { label: 'Action', type: 'text' }, // 'signin' or 'signup'
+        inviteCode: { label: 'Invite Code', type: 'text' }, // Required for signup
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
@@ -54,6 +55,30 @@ export const authOptions: NextAuthOptions = {
         const isSignUp = credentials.action === 'signup';
 
         if (isSignUp) {
+          // Require invite code for signup
+          if (!credentials.inviteCode) {
+            throw new Error('Invite code required to create an account');
+          }
+
+          const inviteCodeValue = credentials.inviteCode.trim().toUpperCase();
+
+          // Validate invite code
+          const inviteCode = await prisma.inviteCode.findUnique({
+            where: { code: inviteCodeValue },
+          });
+
+          if (!inviteCode) {
+            throw new Error('Invalid invite code');
+          }
+
+          if (inviteCode.expiresAt && new Date() > inviteCode.expiresAt) {
+            throw new Error('This invite code has expired');
+          }
+
+          if (inviteCode.useCount >= inviteCode.maxUses) {
+            throw new Error('This invite code has reached its usage limit');
+          }
+
           // Check if user already exists in database
           const existingUser = await prisma.user.findUnique({
             where: { email },
@@ -63,8 +88,8 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Account already exists. Please sign in.');
           }
 
-          // Create new user in database
-          // Note: We store password hash in the name field temporarily
+          // Create new user with invite code link
+          // Note: We store password hash in the image field temporarily
           // In production, add a proper password field to the User model
           const newUser = await prisma.user.create({
             data: {
@@ -72,10 +97,17 @@ export const authOptions: NextAuthOptions = {
               name: email.split('@')[0],
               // Store password hash - in production, add a dedicated password column
               image: passwordHash, // Temporary: using image field for password hash
+              inviteCodeId: inviteCode.id,
             },
           });
+
+          // Increment invite code use count
+          await prisma.inviteCode.update({
+            where: { id: inviteCode.id },
+            data: { useCount: { increment: 1 } },
+          });
           
-          console.log(`New user created in database: ${email} (ID: ${newUser.id})`);
+          console.log(`New user created with invite code: ${email} (ID: ${newUser.id}, Invite: ${inviteCodeValue})`);
           
           return {
             id: newUser.id,
