@@ -187,16 +187,39 @@ See [.env.example](.env.example) for all available environment variables.
 
 JohnnyBets deploys to Azure using GitHub Actions and Bicep infrastructure as code.
 
+### Environments
+
+| Environment | Web URL | API URL |
+|-------------|---------|---------|
+| Production | https://johnnybets.ai | https://api.johnnybets.ai |
+| Staging | https://ca-jbet-web-stg-eus2.blueplant-0e5d4fc7.eastus2.azurecontainerapps.io | https://ca-jbet-api-stg-eus2.blueplant-0e5d4fc7.eastus2.azurecontainerapps.io |
+
+### Deployment Workflows
+
+| Workflow | Trigger | Target |
+|----------|---------|--------|
+| `deploy-web.yml` | Push to `main` (web changes) | Production |
+| `deploy-api.yml` | Push to `main` (api changes) | Production |
+| `deploy-web-staging.yml` | Manual only | Staging |
+| `deploy-api-staging.yml` | Manual only | Staging |
+
+### Deploy to Staging
+
+1. Go to **GitHub Actions**
+2. Select **Deploy Web to Staging** or **Deploy API to Staging**
+3. Click **Run workflow**
+4. Optionally specify a branch or commit SHA
+
 ### Azure Resources
 
-| Resource | Name |
-|----------|------|
-| Resource Group | `rg-johnnybets-prod-eus2` |
-| Container Registry | `crjohnnybets` |
-| Container App (API) | `ca-jbet-api-prod-eus2` |
-| Static Web App | `swa-jbet-web-prod-eus2` |
-| PostgreSQL | `psql-jbet-prod-eus2` |
-| Key Vault | `kv-jbet-prod-eus2` |
+| Resource | Production | Staging |
+|----------|------------|---------|
+| Resource Group | `rg-johnnybets-prod-eus2` | (shared) |
+| Container Registry | `crjohnnybets` | (shared) |
+| Container App (API) | `ca-jbet-api-prod-eus2` | `ca-jbet-api-stg-eus2` |
+| Container App (Web) | `ca-jbet-web-prod-eus2` | `ca-jbet-web-stg-eus2` |
+| PostgreSQL | `psql-jbet-prod-eus2` (`public` schema) | (shared, `staging` schema) |
+| Key Vault | `kv-jbet-prod-eus2` | (shared) |
 
 ### GitHub Secrets Required
 
