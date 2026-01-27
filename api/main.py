@@ -41,7 +41,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",  # Next.js dev
         "http://localhost:3001",
-        "https://johnnybets.com",  # Production
+        "https://johnnybets.ai",  # Production
+        "https://www.johnnybets.ai",
+        "https://johnnybets.com",
         "https://www.johnnybets.com",
     ],
     allow_credentials=True,

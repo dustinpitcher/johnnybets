@@ -22,6 +22,10 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# Build-time environment variables (NEXT_PUBLIC_* must be set at build time)
+ARG NEXT_PUBLIC_API_URL=https://api.johnnybets.ai
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 # Build Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV SKIP_ENV_VALIDATION=true

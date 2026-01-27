@@ -27,6 +27,54 @@ ROSTER_URL = f"{NFLVERSE_BASE_URL}/rosters/roster_{{year}}.parquet"
 # Local cache directory
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "nfl_cache")
 
+# Team name to abbreviation mapping
+TEAM_ABBR = {
+    # Full names
+    "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL",
+    "Buffalo Bills": "BUF", "Carolina Panthers": "CAR", "Chicago Bears": "CHI",
+    "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE", "Dallas Cowboys": "DAL",
+    "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB",
+    "Houston Texans": "HOU", "Indianapolis Colts": "IND", "Jacksonville Jaguars": "JAX",
+    "Kansas City Chiefs": "KC", "Las Vegas Raiders": "LV", "Los Angeles Chargers": "LAC",
+    "Los Angeles Rams": "LA", "Miami Dolphins": "MIA", "Minnesota Vikings": "MIN",
+    "New England Patriots": "NE", "New Orleans Saints": "NO", "New York Giants": "NYG",
+    "New York Jets": "NYJ", "Philadelphia Eagles": "PHI", "Pittsburgh Steelers": "PIT",
+    "San Francisco 49ers": "SF", "Seattle Seahawks": "SEA", "Tampa Bay Buccaneers": "TB",
+    "Tennessee Titans": "TEN", "Washington Commanders": "WAS",
+    # City only
+    "Arizona": "ARI", "Atlanta": "ATL", "Baltimore": "BAL", "Buffalo": "BUF",
+    "Carolina": "CAR", "Chicago": "CHI", "Cincinnati": "CIN", "Cleveland": "CLE",
+    "Dallas": "DAL", "Denver": "DEN", "Detroit": "DET", "Green Bay": "GB",
+    "Houston": "HOU", "Indianapolis": "IND", "Jacksonville": "JAX", "Kansas City": "KC",
+    "Las Vegas": "LV", "Los Angeles Chargers": "LAC", "Los Angeles Rams": "LA",
+    "Miami": "MIA", "Minnesota": "MIN", "New England": "NE", "New Orleans": "NO",
+    "New York Giants": "NYG", "New York Jets": "NYJ", "Philadelphia": "PHI",
+    "Pittsburgh": "PIT", "San Francisco": "SF", "Seattle": "SEA", "Tampa Bay": "TB",
+    "Tennessee": "TEN", "Washington": "WAS",
+    # Nicknames only
+    "Cardinals": "ARI", "Falcons": "ATL", "Ravens": "BAL", "Bills": "BUF",
+    "Panthers": "CAR", "Bears": "CHI", "Bengals": "CIN", "Browns": "CLE",
+    "Cowboys": "DAL", "Broncos": "DEN", "Lions": "DET", "Packers": "GB",
+    "Texans": "HOU", "Colts": "IND", "Jaguars": "JAX", "Chiefs": "KC",
+    "Raiders": "LV", "Chargers": "LAC", "Rams": "LA", "Dolphins": "MIA",
+    "Vikings": "MIN", "Patriots": "NE", "Saints": "NO", "Giants": "NYG",
+    "Jets": "NYJ", "Eagles": "PHI", "Steelers": "PIT", "49ers": "SF",
+    "Seahawks": "SEA", "Buccaneers": "TB", "Titans": "TEN", "Commanders": "WAS",
+}
+
+def normalize_team(team: str) -> str:
+    """Convert team name to standard abbreviation."""
+    if not team:
+        return team
+    # Already an abbreviation
+    if team.upper() in ["ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", 
+                        "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+                        "LA", "LAC", "LV", "MIA", "MIN", "NE", "NO", "NYG", 
+                        "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS"]:
+        return team.upper()
+    # Look up in mapping
+    return TEAM_ABBR.get(team, team)
+
 
 @dataclass
 class DefenseProfile:
@@ -76,8 +124,10 @@ class NFLDataFetcher:
         """
         self.years = years or [2023, 2024, 2025]
         self._pbp_cache: dict[int, pd.DataFrame] = {}
+        self._pbp_combined_cache: dict[tuple, pd.DataFrame] = {}  # Cache combined PBP
         self._roster_cache: dict[int, pd.DataFrame] = {}
         self._defense_profiles_cache: dict[str, DefenseProfile] = {}
+        self._verbose = True  # Control logging
         
         # Ensure cache directory exists
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -110,8 +160,14 @@ class NFLDataFetcher:
         Returns:
             DataFrame with granular play-by-play data.
         """
-        years = list(seasons) if seasons else self.years
-        print(f"📊 Loading play-by-play data for {years}...")
+        years = tuple(seasons) if seasons else tuple(self.years)
+        
+        # Check combined cache first
+        if years in self._pbp_combined_cache:
+            return self._pbp_combined_cache[years]
+        
+        if self._verbose:
+            print(f"📊 Loading play-by-play data for {list(years)}...")
         
         dfs = []
         for year in years:
@@ -121,11 +177,19 @@ class NFLDataFetcher:
             dfs.append(self._pbp_cache[year])
         
         if not dfs or all(df.empty for df in dfs):
-            print("   ⚠️ No play-by-play data available")
+            if self._verbose:
+                print("   ⚠️ No play-by-play data available")
             return pd.DataFrame()
         
         pbp = pd.concat([df for df in dfs if not df.empty], ignore_index=True)
-        print(f"   ✓ Loaded {len(pbp):,} plays")
+        
+        # Cache the combined result
+        self._pbp_combined_cache[years] = pbp
+        
+        if self._verbose:
+            print(f"   ✓ Loaded {len(pbp):,} plays")
+            self._verbose = False  # Only log first time
+        
         return pbp
     
     def get_roster(self, year: int) -> pd.DataFrame:
@@ -162,26 +226,29 @@ class NFLDataFetcher:
         
         This replaces hardcoded defense classifications with actual metrics.
         """
-        cache_key = f"{team}_{seasons or tuple(self.years)}"
+        # Normalize team name to abbreviation
+        team_abbr = normalize_team(team)
+        
+        cache_key = f"{team_abbr}_{seasons or tuple(self.years)}"
         if cache_key in self._defense_profiles_cache:
             return self._defense_profiles_cache[cache_key]
         
         pbp = self.get_play_by_play(seasons)
         if pbp.empty:
             return DefenseProfile(
-                team=team, total_plays=0, sack_rate=0, pressure_proxy=0,
+                team=team_abbr, total_plays=0, sack_rate=0, pressure_proxy=0,
                 avg_air_yards_allowed=0, completion_pct_allowed=0,
                 yards_per_attempt_allowed=0, is_aggressive=False,
                 is_zone_heavy=False, is_blitz_heavy=False
             )
         
-        # Get plays where this team was on defense
-        defense_plays = pbp[pbp['defteam'] == team]
+        # Get plays where this team was on defense (using abbreviation)
+        defense_plays = pbp[pbp['defteam'] == team_abbr]
         pass_plays = defense_plays[defense_plays['play_type'] == 'pass']
         
         if len(pass_plays) == 0:
             return DefenseProfile(
-                team=team, total_plays=0, sack_rate=0, pressure_proxy=0,
+                team=team_abbr, total_plays=0, sack_rate=0, pressure_proxy=0,
                 avg_air_yards_allowed=0, completion_pct_allowed=0,
                 yards_per_attempt_allowed=0, is_aggressive=False,
                 is_zone_heavy=False, is_blitz_heavy=False
@@ -219,7 +286,7 @@ class NFLDataFetcher:
         is_blitz_heavy = sack_rate > 5.0
         
         profile = DefenseProfile(
-            team=team,
+            team=team_abbr,
             total_plays=len(pass_plays),
             sack_rate=round(sack_rate, 2),
             pressure_proxy=round(pressure_proxy, 2),
