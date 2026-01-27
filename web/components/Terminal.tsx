@@ -37,6 +37,8 @@ interface TerminalProps {
   onSessionChange?: (sessionId: string) => void;
   externalMessage?: string | null;
   onExternalMessageHandled?: () => void;
+  populateMessage?: string | null;
+  onPopulateHandled?: () => void;
 }
 
 export default function Terminal({ 
@@ -44,6 +46,8 @@ export default function Terminal({
   onSessionChange,
   externalMessage,
   onExternalMessageHandled,
+  populateMessage,
+  onPopulateHandled,
 }: TerminalProps) {
   const { data: authSession, status: authStatus } = useSession();
   const isAuthenticated = authStatus === 'authenticated';
@@ -118,13 +122,22 @@ export default function Terminal({
     inputRef.current?.focus();
   }, []);
 
-  // Handle external message (e.g., from ticker click)
+  // Handle external message (e.g., from prompt suggestions - auto-submits)
   useEffect(() => {
     if (externalMessage && !isLoading) {
       handleSubmit(undefined, externalMessage);
       onExternalMessageHandled?.();
     }
   }, [externalMessage]);
+
+  // Handle populate message (e.g., from ticker click - just populates input, doesn't submit)
+  useEffect(() => {
+    if (populateMessage) {
+      setInput(populateMessage);
+      inputRef.current?.focus();
+      onPopulateHandled?.();
+    }
+  }, [populateMessage, onPopulateHandled]);
 
   const handleSubmit = useCallback(async (e?: React.FormEvent, overrideMessage?: string) => {
     e?.preventDefault();

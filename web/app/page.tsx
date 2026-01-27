@@ -20,7 +20,8 @@ const PROMPT_SUGGESTIONS = [
 function HomeContent() {
   const searchParams = useSearchParams();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [tickerMessage, setTickerMessage] = useState<string | null>(null);
+  const [externalMessage, setExternalMessage] = useState<string | null>(null);
+  const [populateMessage, setPopulateMessage] = useState<string | null>(null);
   const [sessionRefreshTrigger, setSessionRefreshTrigger] = useState(0);
 
   // Load session from URL query parameter
@@ -31,12 +32,17 @@ function HomeContent() {
     }
   }, [searchParams]);
 
+  // Ticker click: populate input only (user must press Enter)
   const handleGameClick = useCallback((game: any, prompt: string) => {
-    setTickerMessage(prompt);
+    setPopulateMessage(prompt);
   }, []);
 
-  const handleTickerMessageHandled = useCallback(() => {
-    setTickerMessage(null);
+  const handlePopulateHandled = useCallback(() => {
+    setPopulateMessage(null);
+  }, []);
+
+  const handleExternalMessageHandled = useCallback(() => {
+    setExternalMessage(null);
   }, []);
 
   const handleSessionChange = useCallback((sessionId: string) => {
@@ -53,11 +59,12 @@ function HomeContent() {
     setActiveSessionId(sessionId);
   }, []);
 
+  // Prompt suggestion click: auto-submit
   const handlePromptClick = (prompt: string) => {
     // Start a new session with this prompt
     setActiveSessionId(null);
-    // Use ticker message mechanism to send the prompt
-    setTickerMessage(prompt);
+    // Use external message to auto-submit
+    setExternalMessage(prompt);
   };
 
   return (
@@ -93,8 +100,10 @@ function HomeContent() {
           <Terminal 
             activeSessionId={activeSessionId}
             onSessionChange={handleSessionChange}
-            externalMessage={tickerMessage}
-            onExternalMessageHandled={handleTickerMessageHandled}
+            externalMessage={externalMessage}
+            onExternalMessageHandled={handleExternalMessageHandled}
+            populateMessage={populateMessage}
+            onPopulateHandled={handlePopulateHandled}
           />
         </div>
 

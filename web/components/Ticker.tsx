@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 interface Game {
   id: string;
@@ -64,6 +64,12 @@ export default function Ticker({ className, refreshInterval = 60000, onGameClick
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Touch/swipe handling
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchOffset, setTouchOffset] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const tickerRef = useRef<HTMLDivElement>(null);
 
   const fetchScores = useCallback(async () => {
     try {
@@ -94,6 +100,32 @@ export default function Ticker({ className, refreshInterval = 60000, onGameClick
     const interval = setInterval(fetchScores, refreshInterval);
     return () => clearInterval(interval);
   }, [fetchScores, refreshInterval]);
+
+  // Touch event handlers for mobile swipe
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+    setIsSwiping(true);
+    setIsPaused(true);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartX !== null && isSwiping) {
+      const currentX = e.touches[0].clientX;
+      const delta = currentX - touchStartX;
+      setTouchOffset(prev => prev + delta);
+      setTouchStartX(currentX);
+    }
+  }, [touchStartX, isSwiping]);
+
+  const handleTouchEnd = useCallback(() => {
+    setTouchStartX(null);
+    setIsSwiping(false);
+    // Resume animation after a brief moment
+    setTimeout(() => {
+      setIsPaused(false);
+      setTouchOffset(0);
+    }, 100);
+  }, []);
 
   // Don't render if no games and still loading
   if (isLoading && games.length === 0) {
@@ -126,13 +158,17 @@ export default function Ticker({ className, refreshInterval = 60000, onGameClick
       className={`bg-terminal-bg border-b border-terminal-border overflow-hidden ${className}`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <div 
-        className={`flex items-center gap-6 py-2 px-4 ${
-          isPaused ? '' : 'animate-marquee'
-        }`}
+        ref={tickerRef}
+        className="flex items-center gap-6 py-2 px-4"
         style={{
-          animation: isPaused ? 'none' : 'marquee 30s linear infinite',
+          animation: 'marquee var(--marquee-duration) linear infinite',
+          animationPlayState: isPaused ? 'paused' : 'running',
+          transform: isSwiping ? `translateX(${touchOffset}px)` : undefined,
         }}
       >
         {/* Duplicate games for seamless loop */}
@@ -213,8 +249,17 @@ export default function Ticker({ className, refreshInterval = 60000, onGameClick
             transform: translateX(-50%);
           }
         }
-        .animate-marquee {
-          animation: marquee 30s linear infinite;
+        
+        /* Default (mobile-first): faster animation */
+        div {
+          --marquee-duration: 12s;
+        }
+        
+        /* Desktop: slower, more relaxed animation */
+        @media (min-width: 768px) {
+          div {
+            --marquee-duration: 24s;
+          }
         }
       `}</style>
     </div>

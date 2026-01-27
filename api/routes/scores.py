@@ -127,7 +127,7 @@ async def fetch_espn_scores(sport: str) -> List[Game]:
 @router.get("", response_model=ScoresResponse)
 async def get_all_scores():
     """
-    Get live scores for all supported sports (NFL, NHL, MLB).
+    Get live scores for all supported sports (NFL, NHL, MLB, NBA).
     
     Data is fetched from ESPN's public API.
     """
@@ -139,6 +139,7 @@ async def get_all_scores():
         fetch_espn_scores("nfl"),
         fetch_espn_scores("nhl"),
         fetch_espn_scores("mlb"),
+        fetch_espn_scores("nba"),
         return_exceptions=True,
     )
     
