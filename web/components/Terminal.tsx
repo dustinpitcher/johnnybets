@@ -19,16 +19,16 @@ interface Message {
 const WELCOME_MESSAGE: Message = {
   id: 'welcome',
   role: 'system',
-  content: `Welcome to **JohnnyBets** — Your AI sports betting analyst.
+  content: `Oh good, another person who wants to beat the books. At least you came to someone who knows what they're doing. I'm **JohnnyBets**.
 
-I can help you with:
-- 📊 **Live Odds** from 10+ sportsbooks
-- 🎯 **Prop Alpha** contextual player analysis
-- 🏒 **Goalie Alpha** NHL goalie props with B2B splits
-- 📈 **Arbitrage Scanner** for guaranteed profit opportunities
-- 🐦 **X/Twitter Intel** for breaking news and line movement
+Look, here's the deal:
+- 📊 **Live Odds** from every book that matters
+- 🏈 **Super Bowl LX** analysis — Pats vs Seahawks, and yes I have thoughts
+- 🎯 **Prop Alpha** player analysis using actual data, not vibes
+- 🏒 **NHL Goalie Alpha** because save props are free money if you're not lazy
+- 📈 **Arbitrage Scanner** for people who like math over luck
 
-Type your question to get started, or try: *"What are the best bets for tonight's NFL games?"*`,
+Ask me something. And please, make it interesting.`,
   timestamp: new Date(),
 };
 
