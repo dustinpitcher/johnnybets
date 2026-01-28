@@ -29,6 +29,7 @@ class ConversationLogger:
         self.connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         self.container_name = os.getenv("TRACE_CONTAINER_NAME", "conversations")
         self.local_trace_dir = Path(os.getenv("LOCAL_TRACE_DIR", "./traces"))
+        self.environment = os.getenv("ENVIRONMENT", "unknown")
         
         # Lazy-load blob client
         self._blob_service_client = None
@@ -79,6 +80,7 @@ class ConversationLogger:
         return {
             "trace_id": trace_id,
             "timestamp": timestamp.isoformat(),
+            "environment": self.environment,
             "session_id": session_id,
             "model": model,
             "reasoning": reasoning,

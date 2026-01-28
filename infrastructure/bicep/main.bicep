@@ -256,6 +256,10 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               name: 'TRACE_LOGGING_ENABLED'
               value: 'true'
             }
+            {
+              name: 'ENVIRONMENT'
+              value: environment
+            }
           ]
         }
       ]
