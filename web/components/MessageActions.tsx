@@ -67,7 +67,21 @@ export default function MessageActions({ messageId, content, sessionId }: Messag
   const submitFeedback = async () => {
     setIsSubmitting(true);
     try {
-      // Save feedback to database via API
+      // Fetch session context for the feedback report (if session exists)
+      let contextSnapshot = null;
+      if (sessionId) {
+        try {
+          const contextRes = await fetch(`/api/sessions/${sessionId}/context`);
+          if (contextRes.ok) {
+            contextSnapshot = await contextRes.json();
+          }
+        } catch (contextErr) {
+          // Context fetch is optional, continue without it
+          console.warn('Could not fetch session context:', contextErr);
+        }
+      }
+
+      // Save feedback to database via API with context
       const response = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,6 +91,7 @@ export default function MessageActions({ messageId, content, sessionId }: Messag
           comment: feedbackComment || undefined,
           sessionId: sessionId || undefined,
           messageContent: content.slice(0, 1000), // Store first 1000 chars for context
+          contextSnapshot,
         }),
       });
 

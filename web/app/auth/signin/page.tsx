@@ -118,9 +118,19 @@ function SignInForm() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm text-terminal-muted mb-1">
-              Password
-            </label>
+            <div className="flex justify-between items-center mb-1">
+              <label htmlFor="password" className="block text-sm text-terminal-muted">
+                Password
+              </label>
+              {!isSignUp && (
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-xs text-terminal-accent hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <input
               id="password"
               type="password"

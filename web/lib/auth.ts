@@ -13,6 +13,7 @@
  */
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 import prisma from './db';
 // import AppleProvider from 'next-auth/providers/apple';
 // import GoogleProvider from 'next-auth/providers/google';
@@ -20,8 +21,9 @@ import prisma from './db';
 // import TwitterProvider from 'next-auth/providers/twitter';
 // import EmailProvider from 'next-auth/providers/email';
 
-// Helper to hash passwords (simple for dev, use bcrypt in production)
-function simpleHash(str: string): string {
+// Legacy hash function for migration compatibility
+// TODO: Remove after all users have migrated to bcrypt
+function legacySimpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
@@ -51,7 +53,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         const email = credentials.email.toLowerCase().trim();
-        const passwordHash = simpleHash(credentials.password);
         const isSignUp = credentials.action === 'signup';
 
         if (isSignUp) {
@@ -88,15 +89,15 @@ export const authOptions: NextAuthOptions = {
             throw new Error('Account already exists. Please sign in.');
           }
 
-          // Create new user with invite code link
-          // Note: We store password hash in the image field temporarily
-          // In production, add a proper password field to the User model
+          // Hash password with bcrypt (cost factor 12)
+          const passwordHash = await bcrypt.hash(credentials.password, 12);
+
+          // Create new user with password hash in dedicated field
           const newUser = await prisma.user.create({
             data: {
               email,
               name: email.split('@')[0],
-              // Store password hash - in production, add a dedicated password column
-              image: passwordHash, // Temporary: using image field for password hash
+              passwordHash,
               inviteCodeId: inviteCode.id,
             },
           });
@@ -124,8 +125,31 @@ export const authOptions: NextAuthOptions = {
             throw new Error('No account found. Please sign up first.');
           }
 
-          // Check password (stored in image field temporarily)
-          if (user.image !== passwordHash) {
+          // Check password - support both new bcrypt hash and legacy migration
+          let isValidPassword = false;
+          
+          if (user.passwordHash) {
+            // New bcrypt password field
+            isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash);
+          } else if (user.image) {
+            // Legacy: password was stored in image field with simple hash
+            const legacyHash = legacySimpleHash(credentials.password);
+            if (user.image === legacyHash) {
+              isValidPassword = true;
+              // Migrate user to bcrypt on successful login
+              const newPasswordHash = await bcrypt.hash(credentials.password, 12);
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { 
+                  passwordHash: newPasswordHash,
+                  image: null, // Clear legacy password storage
+                },
+              });
+              console.log(`Migrated user ${email} to bcrypt password hash`);
+            }
+          }
+          
+          if (!isValidPassword) {
             throw new Error('Invalid password');
           }
 
@@ -212,11 +236,12 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub;
       }
       session.user.tier = 'free';
-      console.log('[Auth] Session callback - user.id:', session.user.id);
+      session.user.role = (token?.role as 'user' | 'admin') || 'user';
+      console.log('[Auth] Session callback - user.id:', session.user.id, 'role:', session.user.role);
       return session;
     },
     
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         // Store the database user ID in token.id
         token.id = user.id;
@@ -224,6 +249,25 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         console.log('[Auth] JWT callback - setting token.id/sub:', user.id);
       }
+      
+      // Fetch role from database on initial sign in or token refresh
+      if (token?.id && (user || trigger === 'update')) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true },
+        });
+        token.role = dbUser?.role || 'user';
+      } else if (!token.role) {
+        // Fetch role if not already in token
+        if (token?.id) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true },
+          });
+          token.role = dbUser?.role || 'user';
+        }
+      }
+      
       return token;
     },
   },
@@ -241,6 +285,7 @@ declare module 'next-auth' {
       email?: string | null;
       image?: string | null;
       tier: 'free' | 'pro' | 'enterprise';
+      role: 'user' | 'admin';
     };
   }
 }
@@ -248,5 +293,6 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     id?: string;
+    role?: string;
   }
 }

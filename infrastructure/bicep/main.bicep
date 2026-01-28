@@ -58,6 +58,7 @@ var names = {
   containerAppEnv: 'cae-${appName}-${environment}-${regionCode}'
   containerApp: 'ca-${appName}-api-${environment}-${regionCode}'
   staticWebApp: 'swa-${appName}-web-${environment}-${regionCode}'
+  storageAccount: 'st${appName}${environment}${regionCode}' // Conversation trace storage
 }
 
 // =============================================================================
@@ -139,6 +140,29 @@ module postgresql 'modules/postgresql.bicep' = {
   }
 }
 
+// Storage Account (for conversation trace logging)
+module storageAccount 'modules/storageAccount.bicep' = {
+  name: 'deploy-storage-account'
+  params: {
+    name: names.storageAccount
+    location: location
+    tags: tags
+    skuName: 'Standard_LRS'
+    containerName: 'conversations'
+  }
+}
+
+// Azure Communication Services (for transactional emails)
+module communicationServices 'modules/communicationServices.bicep' = {
+  name: 'deploy-communication-services'
+  params: {
+    appName: appName
+    environment: environment
+    regionCode: regionCode
+    tags: tags
+  }
+}
+
 // Container Apps Environment
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: names.containerAppEnv
@@ -203,6 +227,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'database-url'
           value: 'postgresql://${dbAdminUsername}:${dbAdminPassword}@${postgresql.outputs.fqdn}:5432/${fullAppName}?sslmode=require'
         }
+        {
+          name: 'storage-connection-string'
+          value: storageAccount.outputs.connectionString
+        }
+        {
+          name: 'acs-connection-string'
+          value: communicationServices.outputs.connectionString
+        }
       ]
     }
     template: {
@@ -230,6 +262,18 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'BETTING_AGENT_MODEL'
               value: 'x-ai/grok-4.1-fast'
+            }
+            {
+              name: 'AZURE_STORAGE_CONNECTION_STRING'
+              secretRef: 'storage-connection-string'
+            }
+            {
+              name: 'TRACE_LOGGING_ENABLED'
+              value: 'true'
+            }
+            {
+              name: 'ENVIRONMENT'
+              value: environment
             }
           ]
         }
@@ -317,6 +361,22 @@ resource kvDatabaseUrl 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   }
 }
 
+resource kvStorageConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'storage-connection-string'
+  properties: {
+    value: storageAccount.outputs.connectionString
+  }
+}
+
+resource kvAcsConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'acs-connection-string'
+  properties: {
+    value: communicationServices.outputs.connectionString
+  }
+}
+
 // =============================================================================
 // Role Assignments
 // =============================================================================
@@ -343,6 +403,10 @@ output staticWebAppHostname string = staticWebApp.properties.defaultHostname
 output postgresqlFqdn string = postgresql.outputs.fqdn
 output keyVaultUri string = keyVault.properties.vaultUri
 output logAnalyticsWorkspaceId string = logAnalytics.id
+output storageAccountName string = storageAccount.outputs.name
+output storageAccountEndpoint string = storageAccount.outputs.primaryEndpoint
+output acsEndpoint string = communicationServices.outputs.communicationServiceEndpoint
+output acsSenderAddress string = communicationServices.outputs.senderAddress
 
 // Resource names for reference
 output names object = names

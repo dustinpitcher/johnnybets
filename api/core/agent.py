@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from uuid import uuid4
 
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
 from dotenv import load_dotenv
@@ -1054,6 +1054,7 @@ class ChatSession:
     model: str = None
     reasoning: str = None
     _agent: Any = field(default=None, repr=False)
+    last_tools_used: List[str] = field(default_factory=list)  # Track tools from last message
     
     def __post_init__(self):
         # Initialize with system prompt
@@ -1073,6 +1074,15 @@ class ChatSession:
             config={"recursion_limit": 50}
         )
         
+        # Extract tools used from ToolMessage responses
+        tools_used = []
+        for m in response["messages"]:
+            if isinstance(m, ToolMessage):
+                # ToolMessage.name contains the tool name
+                if hasattr(m, "name") and m.name:
+                    tools_used.append(m.name)
+        self.last_tools_used = tools_used
+        
         ai_messages = [m for m in response["messages"] if isinstance(m, AIMessage)]
         if ai_messages:
             final_response = ai_messages[-1].content
@@ -1086,6 +1096,7 @@ class ChatSession:
         self.messages.append(HumanMessage(content=user_input))
         
         full_response = ""
+        tools_used = []  # Track tools for this message
         
         async for event in self._agent.astream_events(
             {"messages": self.messages},
@@ -1103,14 +1114,16 @@ class ChatSession:
             
             elif kind == "on_tool_start":
                 tool_name = event.get("name", "tool")
+                tools_used.append(tool_name)
                 yield f"\n\n*Using {tool_name}...*\n\n"
             
             elif kind == "on_tool_end":
                 pass  # Tool finished, response will follow
         
-        # Save the final response
+        # Save the final response and tools used
         if full_response:
             self.messages.append(AIMessage(content=full_response))
+        self.last_tools_used = tools_used
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert session to dictionary for storage."""
@@ -1120,6 +1133,7 @@ class ChatSession:
             "model": self.model,
             "reasoning": self.reasoning,
             "message_count": len(self.messages),
+            "last_tools_used": self.last_tools_used,
         }
 
 
