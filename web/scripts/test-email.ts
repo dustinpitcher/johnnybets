@@ -39,7 +39,8 @@ async function testEmail(toAddress: string) {
   
   try {
     const poller = await client.beginSend(message);
-    console.log('  Message ID:', poller.getOperationState().id);
+    const operationState = poller.getOperationState();
+    console.log('  Operation status:', operationState.status);
     
     const result = await poller.pollUntilDone();
     console.log('  Status:', result.status);
