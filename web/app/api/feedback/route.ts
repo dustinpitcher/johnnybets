@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         type,
         comment: comment || null,
         messageContent: messageContent || null,
-        contextSnapshot: contextSnapshot || null,
+        contextSnapshot: contextSnapshot || undefined,
       },
     });
 
