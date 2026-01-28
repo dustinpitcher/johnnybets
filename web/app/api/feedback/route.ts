@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/db';
+import { Prisma } from '@prisma/client';
 
 // Context snapshot structure for feedback reports
 interface ContextSnapshot {
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
         type,
         comment: comment || null,
         messageContent: messageContent || null,
-        contextSnapshot: contextSnapshot || undefined,
+        contextSnapshot: contextSnapshot as Prisma.InputJsonValue | undefined,
       },
     });
 
