@@ -152,6 +152,17 @@ module storageAccount 'modules/storageAccount.bicep' = {
   }
 }
 
+// Azure Communication Services (for transactional emails)
+module communicationServices 'modules/communicationServices.bicep' = {
+  name: 'deploy-communication-services'
+  params: {
+    appName: appName
+    environment: environment
+    regionCode: regionCode
+    tags: tags
+  }
+}
+
 // Container Apps Environment
 resource containerAppEnv 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: names.containerAppEnv
@@ -219,6 +230,10 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         {
           name: 'storage-connection-string'
           value: storageAccount.outputs.connectionString
+        }
+        {
+          name: 'acs-connection-string'
+          value: communicationServices.outputs.connectionString
         }
       ]
     }
@@ -354,6 +369,14 @@ resource kvStorageConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01
   }
 }
 
+resource kvAcsConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'acs-connection-string'
+  properties: {
+    value: communicationServices.outputs.connectionString
+  }
+}
+
 // =============================================================================
 // Role Assignments
 // =============================================================================
@@ -382,6 +405,8 @@ output keyVaultUri string = keyVault.properties.vaultUri
 output logAnalyticsWorkspaceId string = logAnalytics.id
 output storageAccountName string = storageAccount.outputs.name
 output storageAccountEndpoint string = storageAccount.outputs.primaryEndpoint
+output acsEndpoint string = communicationServices.outputs.communicationServiceEndpoint
+output acsSenderAddress string = communicationServices.outputs.senderAddress
 
 // Resource names for reference
 output names object = names
