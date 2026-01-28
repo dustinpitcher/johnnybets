@@ -158,7 +158,7 @@ def fetch_kalshi_markets(sport: str = "nfl", market_type: str = "all", limit: in
 
 
 @tool
-def fetch_sportsbook_odds(sport: str = "nfl") -> str:
+def fetch_sportsbook_odds(sport: str = "nfl", max_hours: int = None) -> str:
     """
     Fetch odds from multiple sportsbooks via The Odds API.
     Includes DraftKings, FanDuel, BetMGM, MyBookie, and more.
@@ -168,21 +168,21 @@ def fetch_sportsbook_odds(sport: str = "nfl") -> str:
     
     Args:
         sport: Sport to fetch (nfl, nba, mlb, nhl)
+        max_hours: Optional maximum hours until game start (e.g., 24 for today's games only)
         
     Returns:
         JSON string of odds data from multiple books (future games only)
     """
     try:
         client = OddsAPIClient()
-        now = datetime.now()
         
         if sport.lower() == "nfl":
-            games = client.get_nfl_odds(only_future=True)
+            games = client.get_nfl_odds(only_future=True, max_hours_until_start=max_hours)
         elif sport.lower() == "nba":
-            games = client.get_nba_odds(only_future=True)
+            games = client.get_nba_odds(only_future=True, max_hours_until_start=max_hours)
         else:
             all_games = client.get_odds(sport=sport)
-            games = client.filter_future_games(all_games)
+            games = client.filter_future_games(all_games, max_hours_until_start=max_hours)
         
         # Summarize for readability
         summary = []
@@ -190,6 +190,8 @@ def fetch_sportsbook_odds(sport: str = "nfl") -> str:
             game_info = {
                 "matchup": f"{game.get('away_team')} @ {game.get('home_team')}",
                 "time": game.get("commence_time"),
+                "time_until_start": game.get("_time_until_start"),
+                "time_parse_warning": game.get("_time_parse_warning", False),
                 "bookmakers": []
             }
             for book in game.get("bookmakers", [])[:5]:
@@ -199,11 +201,16 @@ def fetch_sportsbook_odds(sport: str = "nfl") -> str:
                 game_info["bookmakers"].append(book_info)
             summary.append(game_info)
         
+        # Build note based on parameters
+        note = "Only showing games that have NOT started yet (15+ min until kickoff)"
+        if max_hours:
+            note += f" and start within {max_hours} hours"
+        
         return json.dumps({
             "status": "success",
             "current_time_utc": datetime.now(timezone.utc).isoformat(),
             "games_count": len(games),
-            "note": "Only showing games that have NOT started yet (15+ min until kickoff)",
+            "note": note,
             "quota_remaining": client.remaining_requests,
             "games": summary
         }, indent=2, default=str)

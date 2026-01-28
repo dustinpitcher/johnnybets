@@ -104,20 +104,23 @@ class OddsAPIClient:
     def filter_future_games(
         self, 
         games: List[Dict[str, Any]], 
-        min_minutes_until_start: int = 15
+        min_minutes_until_start: int = 15,
+        max_hours_until_start: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
-        Filter out games that have already started or start too soon.
+        Filter to only games within a bettable time window.
         
         Args:
             games: List of games from get_odds()
             min_minutes_until_start: Minimum minutes until game start (default 15)
+            max_hours_until_start: Optional maximum hours until game start (None = no upper limit)
             
         Returns:
-            List of games that haven't started yet
+            List of games within the bettable window, with _time_until_start and _time_parse_warning metadata
         """
         now = datetime.now(timezone.utc)
-        cutoff = now + timedelta(minutes=min_minutes_until_start)
+        min_cutoff = now + timedelta(minutes=min_minutes_until_start)
+        max_cutoff = now + timedelta(hours=max_hours_until_start) if max_hours_until_start else None
         
         future_games = []
         for game in games:
@@ -128,21 +131,42 @@ class OddsAPIClient:
             try:
                 # Parse ISO format timestamp
                 commence_time = datetime.fromisoformat(commence_str.replace("Z", "+00:00"))
-                if commence_time > cutoff:
-                    future_games.append(game)
+                
+                # Check minimum cutoff
+                if commence_time <= min_cutoff:
+                    continue
+                
+                # Check maximum cutoff if specified
+                if max_cutoff and commence_time > max_cutoff:
+                    continue
+                
+                # Calculate time until start for agent context
+                time_until = commence_time - now
+                game["_time_until_start"] = str(time_until)
+                game["_time_parse_warning"] = False
+                future_games.append(game)
+                
             except (ValueError, TypeError):
-                # If we can't parse, include the game to be safe
+                # Flag the game for agent to double-check, don't silently exclude
+                game["_time_parse_warning"] = True
+                game["_time_until_start"] = "UNKNOWN - verify game time"
                 future_games.append(game)
         
         return future_games
 
-    def get_nfl_odds(self, include_mybookie: bool = True, only_future: bool = True) -> List[Dict[str, Any]]:
+    def get_nfl_odds(
+        self, 
+        include_mybookie: bool = True, 
+        only_future: bool = True,
+        max_hours_until_start: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """
         Convenience method to get NFL odds.
         
         Args:
             include_mybookie: If True, specifically include mybookieag in results
             only_future: If True, filter out games that have already started
+            max_hours_until_start: Optional maximum hours until game start
             
         Returns:
             List of NFL games with odds
@@ -151,15 +175,25 @@ class OddsAPIClient:
         games = self.get_odds(sport="nfl", bookmakers=bookmakers)
         
         if only_future:
-            games = self.filter_future_games(games)
+            games = self.filter_future_games(games, max_hours_until_start=max_hours_until_start)
         
         return games
 
-    def get_nba_odds(self, only_future: bool = True) -> List[Dict[str, Any]]:
-        """Get NBA odds (future games only by default)."""
+    def get_nba_odds(
+        self, 
+        only_future: bool = True,
+        max_hours_until_start: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get NBA odds (future games only by default).
+        
+        Args:
+            only_future: If True, filter out games that have already started
+            max_hours_until_start: Optional maximum hours until game start
+        """
         games = self.get_odds(sport="nba")
         if only_future:
-            games = self.filter_future_games(games)
+            games = self.filter_future_games(games, max_hours_until_start=max_hours_until_start)
         return games
 
     def format_game_summary(self, game: Dict[str, Any]) -> Dict[str, Any]:
