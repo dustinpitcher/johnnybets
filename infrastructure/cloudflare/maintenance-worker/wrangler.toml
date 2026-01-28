@@ -1,0 +1,25 @@
+name = "johnnybets-maintenance"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Routes - uncomment and configure when ready to deploy
+# routes = [
+#   { pattern = "johnnybets.com/*", zone_name = "johnnybets.com" },
+#   { pattern = "www.johnnybets.com/*", zone_name = "johnnybets.com" }
+# ]
+
+[vars]
+# Set to "true" to enable maintenance mode, "false" to disable
+MAINTENANCE_MODE = "false"
+
+# Comma-separated list of IP addresses that can bypass maintenance mode
+# ALLOWED_IPS = "1.2.3.4,5.6.7.8"
+
+# Optional: paths that should still work during maintenance (comma-separated)
+# ALLOWED_PATHS = "/api/health,/api/status"
+
+# Estimated time for maintenance (shown to users)
+ESTIMATED_TIME = "shortly"
+
+# Contact email for urgent issues
+CONTACT_EMAIL = "support@johnnybets.com"
