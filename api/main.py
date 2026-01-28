@@ -45,6 +45,7 @@ app.add_middleware(
         "https://www.johnnybets.ai",
         "https://johnnybets.com",
         "https://www.johnnybets.com",
+        "https://ca-jbet-web-stg-eus2.blueplant-0e5d4fc7.eastus2.azurecontainerapps.io",  # Staging
     ],
     allow_credentials=True,
     allow_methods=["*"],
