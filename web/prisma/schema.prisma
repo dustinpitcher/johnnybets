@@ -63,6 +63,9 @@ model User {
   messageCount  Int       @default(0) @map("message_count")
   lastActiveAt  DateTime? @map("last_active_at")
   
+  // Role-based access
+  role          String    @default("user") // user, admin
+  
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -161,11 +164,18 @@ model MessageFeedback {
   // Context for analysis
   messageContent String? @db.Text @map("message_content")
   
+  // Rich context snapshot for evaluation
+  // Structure: { recentMessages: [{role, content, toolsUsed, timestamp}], 
+  //              sessionMeta: {model, reasoning, entities, title},
+  //              userMeta: {isAuthenticated, hasApiKeys} }
+  contextSnapshot Json?  @map("context_snapshot")
+  
   createdAt   DateTime  @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([sessionId])
   @@index([type])
+  @@index([createdAt])
   @@map("message_feedback")
 }
 

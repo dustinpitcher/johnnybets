@@ -212,11 +212,12 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub;
       }
       session.user.tier = 'free';
-      console.log('[Auth] Session callback - user.id:', session.user.id);
+      session.user.role = (token?.role as 'user' | 'admin') || 'user';
+      console.log('[Auth] Session callback - user.id:', session.user.id, 'role:', session.user.role);
       return session;
     },
     
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         // Store the database user ID in token.id
         token.id = user.id;
@@ -224,6 +225,25 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         console.log('[Auth] JWT callback - setting token.id/sub:', user.id);
       }
+      
+      // Fetch role from database on initial sign in or token refresh
+      if (token?.id && (user || trigger === 'update')) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true },
+        });
+        token.role = dbUser?.role || 'user';
+      } else if (!token.role) {
+        // Fetch role if not already in token
+        if (token?.id) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true },
+          });
+          token.role = dbUser?.role || 'user';
+        }
+      }
+      
       return token;
     },
   },
@@ -241,6 +261,7 @@ declare module 'next-auth' {
       email?: string | null;
       image?: string | null;
       tier: 'free' | 'pro' | 'enterprise';
+      role: 'user' | 'admin';
     };
   }
 }
@@ -248,5 +269,6 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     id?: string;
+    role?: string;
   }
 }

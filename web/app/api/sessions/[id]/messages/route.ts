@@ -44,7 +44,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   try {
     const body = await request.json();
-    const { role, content } = body as { role: string; content: string };
+    const { role, content, toolsUsed } = body as { 
+      role: string; 
+      content: string; 
+      toolsUsed?: string[];
+    };
 
     if (!role || !content) {
       return NextResponse.json({ error: 'Role and content are required' }, { status: 400 });
@@ -73,6 +77,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         sessionId: id,
         role,
         content,
+        toolsUsed: toolsUsed || [],
       },
     });
 

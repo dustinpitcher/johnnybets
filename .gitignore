@@ -57,3 +57,6 @@ docker-compose.override.yml
 tmp/
 temp/
 *.tmp
+
+# Conversation traces (local development)
+traces/

@@ -3,8 +3,11 @@ Chat API Routes
 
 Endpoints for the chat interface with streaming support.
 """
-from typing import Optional
-from fastapi import APIRouter, HTTPException
+import json
+import time
+import asyncio
+from typing import Optional, List
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -14,6 +17,7 @@ from api.core.agent import (
     delete_session,
     ChatSession,
 )
+from api.core.trace_logger import get_logger
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -44,6 +48,7 @@ class ChatResponse(BaseModel):
     session_id: str
     response: str
     message_count: int
+    tools_used: List[str] = []
 
 
 @router.post("/sessions", response_model=CreateSessionResponse)
@@ -102,12 +107,29 @@ async def send_message(session_id: str, request: ChatRequest):
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
     
+    start_time = time.time()
     response = await session.chat(request.message)
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    
+    # Log trace asynchronously
+    logger = get_logger()
+    asyncio.create_task(
+        logger.log_trace(
+            session_id=session.session_id,
+            user_input=request.message,
+            response=response,
+            tools_used=session.last_tools_used,
+            model=session.model,
+            reasoning=session.reasoning,
+            latency_ms=elapsed_ms
+        )
+    )
     
     return ChatResponse(
         session_id=session_id,
         response=response,
         message_count=len(session.messages),
+        tools_used=session.last_tools_used,
     )
 
 
@@ -117,7 +139,8 @@ async def stream_message(session_id: str, request: ChatRequest):
     Send a message and stream the response via Server-Sent Events (SSE).
     
     The response is streamed as text/event-stream with each chunk
-    as a data event.
+    as a data event. At the end, a 'tools' event is sent with the list
+    of tools used during the response.
     """
     session = get_session(session_id)
     if not session:
@@ -126,16 +149,44 @@ async def stream_message(session_id: str, request: ChatRequest):
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
     
+    # Get trace logger
+    logger = get_logger()
+    user_input = request.message
+    
     async def event_generator():
         """Generate SSE events from the chat stream."""
+        start_time = time.time()
+        full_response = ""
+        
         try:
             async for chunk in session.chat_stream(request.message):
+                # Capture full response for logging
+                full_response += chunk
                 # Escape newlines for SSE format
                 escaped = chunk.replace("\n", "\\n")
                 yield f"data: {escaped}\n\n"
             
+            # Send tools used event before done
+            if session.last_tools_used:
+                tools_json = json.dumps(session.last_tools_used)
+                yield f"event: tools\ndata: {tools_json}\n\n"
+            
             # Send done event
             yield "data: [DONE]\n\n"
+            
+            # Log trace asynchronously (fire-and-forget)
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            asyncio.create_task(
+                logger.log_trace(
+                    session_id=session.session_id,
+                    user_input=user_input,
+                    response=full_response,
+                    tools_used=session.last_tools_used,
+                    model=session.model,
+                    reasoning=session.reasoning,
+                    latency_ms=elapsed_ms
+                )
+            )
         except Exception as e:
             yield f"data: [ERROR] {str(e)}\n\n"
     
@@ -168,12 +219,30 @@ async def quick_chat(request: QuickChatRequest):
     Note: Session is still stored and can be continued.
     """
     session = create_session(model=request.model, reasoning=request.reasoning)
+    
+    start_time = time.time()
     response = await session.chat(request.message)
+    elapsed_ms = int((time.time() - start_time) * 1000)
+    
+    # Log trace asynchronously
+    logger = get_logger()
+    asyncio.create_task(
+        logger.log_trace(
+            session_id=session.session_id,
+            user_input=request.message,
+            response=response,
+            tools_used=session.last_tools_used,
+            model=session.model,
+            reasoning=session.reasoning,
+            latency_ms=elapsed_ms
+        )
+    )
     
     return {
         "session_id": session.session_id,
         "response": response,
         "message_count": len(session.messages),
+        "tools_used": session.last_tools_used,
     }
 
 
@@ -186,17 +255,45 @@ async def quick_chat_stream(request: QuickChatRequest):
     """
     session = create_session(model=request.model, reasoning=request.reasoning)
     
+    # Get trace logger
+    logger = get_logger()
+    user_input = request.message
+    
     async def event_generator():
         """Generate SSE events from the chat stream."""
+        start_time = time.time()
+        full_response = ""
+        
         # First send the session ID
         yield f"event: session\ndata: {session.session_id}\n\n"
         
         try:
             async for chunk in session.chat_stream(request.message):
+                # Capture full response for logging
+                full_response += chunk
                 escaped = chunk.replace("\n", "\\n")
                 yield f"data: {escaped}\n\n"
             
+            # Send tools used event before done
+            if session.last_tools_used:
+                tools_json = json.dumps(session.last_tools_used)
+                yield f"event: tools\ndata: {tools_json}\n\n"
+            
             yield "data: [DONE]\n\n"
+            
+            # Log trace asynchronously (fire-and-forget)
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            asyncio.create_task(
+                logger.log_trace(
+                    session_id=session.session_id,
+                    user_input=user_input,
+                    response=full_response,
+                    tools_used=session.last_tools_used,
+                    model=session.model,
+                    reasoning=session.reasoning,
+                    latency_ms=elapsed_ms
+                )
+            )
         except Exception as e:
             yield f"data: [ERROR] {str(e)}\n\n"
     

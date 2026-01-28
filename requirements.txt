@@ -33,3 +33,6 @@ cryptography>=41.0.0
 
 # NBA Data
 nba_api>=1.5.0
+
+# Azure Storage (for conversation trace logging)
+azure-storage-blob>=12.19.0
