@@ -1,13 +1,12 @@
 name: Deploy Web to Azure Container App
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'web/**'
-      - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or commit to deploy'
+        required: false
+        default: 'main'
 
 env:
   REGISTRY: crjohnnybets.azurecr.io
@@ -23,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || 'main' }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -103,4 +104,5 @@ jobs:
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Container App | \`${{ env.CONTAINER_APP }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Image | \`${{ env.IMAGE_NAME }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch/Ref | \`${{ github.event.inputs.ref || 'main' }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| URL | https://johnnybets.ai |" >> $GITHUB_STEP_SUMMARY
