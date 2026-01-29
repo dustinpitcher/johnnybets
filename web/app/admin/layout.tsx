@@ -70,6 +70,12 @@ export default function AdminLayout({
               Feedback
             </Link>
             <Link
+              href="/admin/invites"
+              className="text-terminal-muted hover:text-terminal-accent text-sm font-mono transition-colors"
+            >
+              Invites
+            </Link>
+            <Link
               href="/"
               className="text-terminal-muted hover:text-terminal-text text-sm font-mono transition-colors"
             >
