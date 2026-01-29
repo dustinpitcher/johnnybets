@@ -59,23 +59,25 @@ class ConversationLogger:
         session_id: str,
         user_input: str,
         response: str,
-        tools_used: List[str],
+        tool_calls: List[Dict[str, Any]],
         model: Optional[str],
         reasoning: Optional[str],
         latency_ms: int,
-        tool_latencies: Optional[Dict[str, int]] = None
     ) -> Dict[str, Any]:
-        """Build the trace document."""
+        """
+        Build the trace document.
+        
+        Args:
+            tool_calls: List of tool call dicts with structure:
+                {
+                    "name": str,
+                    "inputs": dict,
+                    "output": str,
+                    "latency_ms": int
+                }
+        """
         trace_id = str(uuid4())
         timestamp = datetime.now(timezone.utc)
-        
-        # Build tool calls array
-        tool_calls = []
-        for tool_name in tools_used:
-            tool_call = {"name": tool_name}
-            if tool_latencies and tool_name in tool_latencies:
-                tool_call["latency_ms"] = tool_latencies[tool_name]
-            tool_calls.append(tool_call)
         
         return {
             "trace_id": trace_id,
@@ -89,7 +91,7 @@ class ConversationLogger:
             "tool_calls": tool_calls,
             "metrics": {
                 "total_latency_ms": latency_ms,
-                "tool_call_count": len(tools_used),
+                "tool_call_count": len(tool_calls),
                 "response_length": len(response),
                 "input_length": len(user_input),
             }
@@ -156,11 +158,13 @@ class ConversationLogger:
         session_id: str,
         user_input: str,
         response: str,
-        tools_used: List[str],
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
         model: Optional[str] = None,
         reasoning: Optional[str] = None,
         latency_ms: int = 0,
-        tool_latencies: Optional[Dict[str, int]] = None
+        # Deprecated - for backward compatibility
+        tools_used: Optional[List[str]] = None,
+        tool_latencies: Optional[Dict[str, int]] = None,
     ) -> Optional[str]:
         """
         Log a conversation trace.
@@ -169,11 +173,13 @@ class ConversationLogger:
             session_id: The chat session ID
             user_input: The user's message
             response: The assistant's response
-            tools_used: List of tool names that were called
+            tool_calls: List of rich tool call dicts with inputs/outputs:
+                [{"name": str, "inputs": dict, "output": str, "latency_ms": int}]
             model: The LLM model used
             reasoning: The reasoning mode (high, medium, low, none)
             latency_ms: Total response time in milliseconds
-            tool_latencies: Optional dict of tool name -> latency in ms
+            tools_used: DEPRECATED - List of tool names (use tool_calls instead)
+            tool_latencies: DEPRECATED - Dict of tool latencies (use tool_calls instead)
             
         Returns:
             The trace_id if successful, None otherwise
@@ -181,16 +187,26 @@ class ConversationLogger:
         if not self.enabled:
             return None
         
+        # Handle backward compatibility: convert old format to new
+        if tool_calls is None and tools_used is not None:
+            tool_calls = []
+            for tool_name in tools_used:
+                tc = {"name": tool_name, "inputs": {}, "output": None}
+                if tool_latencies and tool_name in tool_latencies:
+                    tc["latency_ms"] = tool_latencies[tool_name]
+                tool_calls.append(tc)
+        elif tool_calls is None:
+            tool_calls = []
+        
         # Build the trace document
         trace = self._build_trace(
             session_id=session_id,
             user_input=user_input,
             response=response,
-            tools_used=tools_used,
+            tool_calls=tool_calls,
             model=model,
             reasoning=reasoning,
             latency_ms=latency_ms,
-            tool_latencies=tool_latencies
         )
         
         # Try to upload to blob storage, fall back to local

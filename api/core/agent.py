@@ -1068,7 +1068,12 @@ class ChatSession:
     model: str = None
     reasoning: str = None
     _agent: Any = field(default=None, repr=False)
-    last_tools_used: List[str] = field(default_factory=list)  # Track tools from last message
+    last_tool_calls: List[Dict[str, Any]] = field(default_factory=list)  # Rich tool call data
+    
+    @property
+    def last_tools_used(self) -> List[str]:
+        """Backward compatibility: return just tool names."""
+        return [tc.get("name", "") for tc in self.last_tool_calls]
     
     def __post_init__(self):
         # Initialize with system prompt
@@ -1081,6 +1086,7 @@ class ChatSession:
     
     async def chat(self, user_input: str) -> str:
         """Send a message and get a response."""
+        import time
         self.messages.append(HumanMessage(content=user_input))
         
         response = await self._agent.ainvoke(
@@ -1088,14 +1094,35 @@ class ChatSession:
             config={"recursion_limit": 50}
         )
         
-        # Extract tools used from ToolMessage responses
-        tools_used = []
+        # Extract tool calls with inputs and outputs
+        # AIMessage contains tool_calls (inputs), ToolMessage contains output
+        tool_calls_data = []
+        tool_inputs = {}  # Map tool_call_id -> {name, inputs}
+        
         for m in response["messages"]:
+            # AIMessage with tool_calls contains the inputs
+            if isinstance(m, AIMessage) and hasattr(m, "tool_calls") and m.tool_calls:
+                for tc in m.tool_calls:
+                    tool_id = tc.get("id", "")
+                    tool_inputs[tool_id] = {
+                        "name": tc.get("name", ""),
+                        "inputs": tc.get("args", {}),
+                    }
+            
+            # ToolMessage contains the output
             if isinstance(m, ToolMessage):
-                # ToolMessage.name contains the tool name
-                if hasattr(m, "name") and m.name:
-                    tools_used.append(m.name)
-        self.last_tools_used = tools_used
+                tool_id = getattr(m, "tool_call_id", "")
+                tool_name = getattr(m, "name", "") or tool_inputs.get(tool_id, {}).get("name", "unknown")
+                inputs = tool_inputs.get(tool_id, {}).get("inputs", {})
+                output = m.content if hasattr(m, "content") else ""
+                
+                tool_calls_data.append({
+                    "name": tool_name,
+                    "inputs": inputs,
+                    "output": output,
+                })
+        
+        self.last_tool_calls = tool_calls_data
         
         ai_messages = [m for m in response["messages"] if isinstance(m, AIMessage)]
         if ai_messages:
@@ -1107,10 +1134,12 @@ class ChatSession:
     
     async def chat_stream(self, user_input: str) -> AsyncGenerator[str, None]:
         """Send a message and stream the response."""
+        import time
         self.messages.append(HumanMessage(content=user_input))
         
         full_response = ""
-        tools_used = []  # Track tools for this message
+        tool_calls_data = []  # Rich tool call data
+        active_tools = {}  # Map run_id -> {name, inputs, start_time}
         
         async for event in self._agent.astream_events(
             {"messages": self.messages},
@@ -1128,16 +1157,37 @@ class ChatSession:
             
             elif kind == "on_tool_start":
                 tool_name = event.get("name", "tool")
-                tools_used.append(tool_name)
+                run_id = event.get("run_id", "")
+                inputs = event.get("data", {}).get("input", {})
+                
+                # Track active tool with start time
+                active_tools[run_id] = {
+                    "name": tool_name,
+                    "inputs": inputs,
+                    "start_time": time.time(),
+                }
                 yield f"\n\n*Using {tool_name}...*\n\n"
             
             elif kind == "on_tool_end":
-                pass  # Tool finished, response will follow
+                run_id = event.get("run_id", "")
+                output = event.get("data", {}).get("output", "")
+                
+                # Match with start event and calculate latency
+                if run_id in active_tools:
+                    tool_info = active_tools.pop(run_id)
+                    latency_ms = int((time.time() - tool_info["start_time"]) * 1000)
+                    
+                    tool_calls_data.append({
+                        "name": tool_info["name"],
+                        "inputs": tool_info["inputs"],
+                        "output": str(output) if output else "",
+                        "latency_ms": latency_ms,
+                    })
         
-        # Save the final response and tools used
+        # Save the final response and tool calls
         if full_response:
             self.messages.append(AIMessage(content=full_response))
-        self.last_tools_used = tools_used
+        self.last_tool_calls = tool_calls_data
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert session to dictionary for storage."""
@@ -1147,7 +1197,8 @@ class ChatSession:
             "model": self.model,
             "reasoning": self.reasoning,
             "message_count": len(self.messages),
-            "last_tools_used": self.last_tools_used,
+            "last_tools_used": self.last_tools_used,  # Backward compat
+            "last_tool_calls": self.last_tool_calls,  # Rich data
         }
 
 

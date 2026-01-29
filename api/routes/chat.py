@@ -111,14 +111,14 @@ async def send_message(session_id: str, request: ChatRequest):
     response = await session.chat(request.message)
     elapsed_ms = int((time.time() - start_time) * 1000)
     
-    # Log trace asynchronously
+    # Log trace asynchronously with rich tool call data
     logger = get_logger()
     asyncio.create_task(
         logger.log_trace(
             session_id=session.session_id,
             user_input=request.message,
             response=response,
-            tools_used=session.last_tools_used,
+            tool_calls=session.last_tool_calls,
             model=session.model,
             reasoning=session.reasoning,
             latency_ms=elapsed_ms
@@ -174,14 +174,14 @@ async def stream_message(session_id: str, request: ChatRequest):
             # Send done event
             yield "data: [DONE]\n\n"
             
-            # Log trace asynchronously (fire-and-forget)
+            # Log trace asynchronously (fire-and-forget) with rich tool call data
             elapsed_ms = int((time.time() - start_time) * 1000)
             asyncio.create_task(
                 logger.log_trace(
                     session_id=session.session_id,
                     user_input=user_input,
                     response=full_response,
-                    tools_used=session.last_tools_used,
+                    tool_calls=session.last_tool_calls,
                     model=session.model,
                     reasoning=session.reasoning,
                     latency_ms=elapsed_ms
@@ -224,14 +224,14 @@ async def quick_chat(request: QuickChatRequest):
     response = await session.chat(request.message)
     elapsed_ms = int((time.time() - start_time) * 1000)
     
-    # Log trace asynchronously
+    # Log trace asynchronously with rich tool call data
     logger = get_logger()
     asyncio.create_task(
         logger.log_trace(
             session_id=session.session_id,
             user_input=request.message,
             response=response,
-            tools_used=session.last_tools_used,
+            tool_calls=session.last_tool_calls,
             model=session.model,
             reasoning=session.reasoning,
             latency_ms=elapsed_ms
@@ -281,14 +281,14 @@ async def quick_chat_stream(request: QuickChatRequest):
             
             yield "data: [DONE]\n\n"
             
-            # Log trace asynchronously (fire-and-forget)
+            # Log trace asynchronously (fire-and-forget) with rich tool call data
             elapsed_ms = int((time.time() - start_time) * 1000)
             asyncio.create_task(
                 logger.log_trace(
                     session_id=session.session_id,
                     user_input=user_input,
                     response=full_response,
-                    tools_used=session.last_tools_used,
+                    tool_calls=session.last_tool_calls,
                     model=session.model,
                     reasoning=session.reasoning,
                     latency_ms=elapsed_ms
