@@ -6,7 +6,7 @@ import ToolCard from '@/components/ToolCard';
 import { getTools, getToolStats, voteForTool, type Tool, type ToolStats } from '@/lib/api';
 
 type FilterStatus = 'all' | 'free' | 'premium' | 'roadmap' | 'idea';
-type FilterSport = 'all' | 'nfl' | 'nhl' | 'mlb';
+type FilterSport = 'all' | 'nfl' | 'nba' | 'nhl' | 'mlb';
 
 export default function ToolsPage() {
   const [tools, setTools] = useState<Tool[]>([]);
@@ -136,7 +136,7 @@ export default function ToolsPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-terminal-muted">Sport:</span>
             <div className="flex gap-1">
-              {(['all', 'nfl', 'nhl', 'mlb'] as FilterSport[]).map(sport => (
+              {(['all', 'nfl', 'nba', 'nhl', 'mlb'] as FilterSport[]).map(sport => (
                 <button
                   key={sport}
                   onClick={() => setSportFilter(sport)}
@@ -307,9 +307,9 @@ const MOCK_TOOLS: Tool[] = [
 ];
 
 const MOCK_STATS: ToolStats = {
-  total: 18,
-  by_status: { free: 12, premium: 0, roadmap: 4, idea: 2 },
-  by_category: { general: 8, nfl: 4, nhl: 5, mlb: 1 },
-  by_sport: { nfl: 14, nhl: 12, mlb: 10, nba: 4 },
+  total: 32,
+  by_status: { free: 28, premium: 0, roadmap: 2, idea: 2 },
+  by_category: { general: 12, nfl: 4, nba: 5, nhl: 5, mlb: 6 },
+  by_sport: { nfl: 16, nhl: 16, mlb: 17, nba: 13 },
 };
 

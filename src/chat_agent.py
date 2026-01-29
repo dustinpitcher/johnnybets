@@ -5,7 +5,6 @@ This agent can:
 - Fetch market data from Kalshi and sportsbooks
 - Analyze betting opportunities
 - Chat interactively to refine strategy
-- Save strategies and reports to files
 """
 import os
 import json
@@ -26,9 +25,6 @@ load_dotenv("/Users/dustinpitcher/ai_workspace/.env")
 from projects.active.sports_betting.src.tools.kalshi import KalshiClient
 from projects.active.sports_betting.src.tools.odds_api import OddsAPIClient
 from projects.active.sports_betting.src.tools.x_search import XSearchClient
-from projects.active.sports_betting.src.tools.file_tools import (
-    save_strategy, save_report, list_saved_files, read_saved_file
-)
 from projects.active.sports_betting.src.analysis.contextual_props import ContextualPropsAnalyzer, MatchupAnalysis
 from projects.active.sports_betting.src.tools.nfl_data import NFLDataFetcher
 from projects.active.sports_betting.src.analysis.edge_validator import EdgeValidator, validate_bet
@@ -287,106 +283,6 @@ def find_arbitrage_opportunities(sport: str = "nfl") -> str:
         }, indent=2)
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)})
-
-
-@tool
-def save_betting_strategy(name: str, content: str) -> str:
-    """
-    Save a betting strategy to a file for future reference.
-    
-    Args:
-        name: Name/title of the strategy
-        content: Full strategy description, rules, and conditions
-        
-    Returns:
-        Path to the saved file
-    """
-    try:
-        filepath = save_strategy(name, content)
-        return f"Strategy saved to: {filepath}"
-    except Exception as e:
-        return f"Error saving strategy: {e}"
-
-
-@tool
-def save_analysis_report(content: str, report_type: str = "analysis") -> str:
-    """
-    Save an analysis report to a file.
-    
-    Args:
-        content: The report content (markdown format recommended)
-        report_type: Type of report (analysis, arb, daily, weekly)
-        
-    Returns:
-        Path to the saved file
-    """
-    try:
-        filepath = save_report(content, report_type)
-        return f"Report saved to: {filepath}"
-    except Exception as e:
-        return f"Error saving report: {e}"
-
-
-@tool
-def list_saved_strategies() -> str:
-    """
-    List all previously saved strategies.
-    
-    Returns:
-        List of saved strategy files
-    """
-    files = list_saved_files("strategies")
-    if not files:
-        return "No strategies saved yet."
-    return "Saved strategies:\n" + "\n".join(f"  - {f}" for f in sorted(files))
-
-
-@tool
-def read_strategy(filename: str) -> str:
-    """
-    Read a previously saved strategy.
-    
-    Args:
-        filename: Name of the strategy file to read
-        
-    Returns:
-        Content of the strategy file
-    """
-    content = read_saved_file(filename, "strategies")
-    if content is None:
-        return f"Strategy file not found: {filename}"
-    return content
-
-
-@tool
-def list_saved_reports() -> str:
-    """
-    List all previously saved analysis reports.
-    
-    Returns:
-        List of saved report files
-    """
-    files = list_saved_files("reports")
-    if not files:
-        return "No reports saved yet."
-    return "Saved reports:\n" + "\n".join(f"  - {f}" for f in sorted(files))
-
-
-@tool
-def read_report(filename: str) -> str:
-    """
-    Read a previously saved analysis report.
-    
-    Args:
-        filename: Name of the report file to read
-        
-    Returns:
-        Content of the report file
-    """
-    content = read_saved_file(filename, "reports")
-    if content is None:
-        return f"Report file not found: {filename}"
-    return content
 
 
 @tool
@@ -1098,7 +994,6 @@ Your capabilities:
    - Flags weather/narrative traps that books have already priced in
 7. **X/Twitter Intel**: Use search_x_twitter, get_injury_updates, get_line_movement_buzz, and get_breaking_sports_news to get real-time information from X that could affect lines
 8. **Analyze**: Compare prediction market prices with sportsbook lines to find value
-9. **Save Work**: Use save_betting_strategy and save_analysis_report to persist findings
 
 ## Sentiment Analysis Guidelines
 
@@ -1191,7 +1086,7 @@ Your capabilities:
 7. **Low Shot Games**: Betting over on goalie saves in games projected for <28 shots is a losing play.
 8. **Assuming Possession = Goals**: High Corsi% teams don't always score. Check xG and finishing rates.
 
-Be conversational and helpful. Ask clarifying questions if needed. Offer to save strategies when you develop actionable plans."""
+Be conversational and helpful. Ask clarifying questions if needed."""
 
 
 def create_betting_agent(model: str = None, reasoning: str = None):
@@ -1283,13 +1178,6 @@ def create_betting_agent(model: str = None, reasoning: str = None):
         get_injury_updates,
         get_line_movement_buzz,
         get_breaking_sports_news,
-        # File management
-        save_betting_strategy,
-        save_analysis_report,
-        list_saved_strategies,
-        read_strategy,
-        list_saved_reports,
-        read_report,
     ]
     
     agent = create_react_agent(llm, tools)

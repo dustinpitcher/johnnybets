@@ -54,6 +54,7 @@ export interface ToolStats {
   by_category: {
     general: number;
     nfl: number;
+    nba: number;
     nhl: number;
     mlb: number;
   };

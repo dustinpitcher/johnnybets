@@ -31,7 +31,6 @@ if project_root not in sys.path:
 from src.tools.kalshi import KalshiClient
 from src.tools.odds_api import OddsAPIClient
 from src.tools.x_search import XSearchClient
-from src.tools.file_tools import save_strategy, save_report
 from src.analysis.contextual_props import ContextualPropsAnalyzer
 from src.tools.nfl_data import NFLDataFetcher
 from src.analysis.edge_validator import validate_bet
@@ -916,24 +915,6 @@ def get_mlb_weather_impact(
     return _get_weather_impact(home_team, wind_mph, wind_direction, temp_f)
 
 
-@tool
-def save_betting_strategy(name: str, content: str) -> str:
-    """Save a betting strategy to a file."""
-    try:
-        filepath = save_strategy(name, content)
-        return f"Strategy saved to: {filepath}"
-    except Exception as e:
-        return f"Error saving strategy: {e}"
-
-
-@tool
-def save_analysis_report(content: str, report_type: str = "analysis") -> str:
-    """Save an analysis report to a file."""
-    try:
-        filepath = save_report(content, report_type)
-        return f"Report saved to: {filepath}"
-    except Exception as e:
-        return f"Error saving report: {e}"
 
 
 # =============================================================================
@@ -1017,9 +998,6 @@ def get_all_tools():
         get_mlb_park_factors,
         analyze_bullpen_usage,
         get_mlb_weather_impact,
-        # Utilities
-        save_betting_strategy,
-        save_analysis_report,
     ]
 
 

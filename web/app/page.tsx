@@ -10,7 +10,7 @@ import SessionsList from '@/components/SessionsList';
 // Prompt suggestions based on upcoming games
 const PROMPT_SUGGESTIONS = [
   "Break down Patriots vs Seahawks for Super Bowl LX",
-  "Best player props for the Super Bowl this Sunday",
+  "Best player props for the Super Bowl",
   "Find arbitrage opportunities in tonight's NBA games",
   "Which NHL goalies have the best save props tonight?",
   "What's the sharp money saying about the Super Bowl?",
@@ -122,56 +122,59 @@ function HomeContent() {
         </div>
 
         {/* Sidebar (visible on larger screens) */}
-        <aside className="hidden lg:flex lg:flex-col w-72 border-l border-terminal-border bg-terminal-surface">
-          {/* Sessions */}
-          <div className="p-4 border-b border-terminal-border">
-            <SessionsList
-              currentSessionId={activeSessionId}
-              onSessionSelect={handleSessionSelect}
-              onNewSession={handleNewSession}
-              refreshTrigger={sessionRefreshTrigger}
-            />
-          </div>
-
-          {/* Suggestions */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
-              Try Asking
-            </h2>
-            <div className="space-y-2">
-              {PROMPT_SUGGESTIONS.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handlePromptClick(prompt)}
-                  className="w-full text-left text-sm text-terminal-text hover:text-terminal-accent 
-                           bg-terminal-bg hover:bg-terminal-border/50 
-                           px-3 py-2 rounded transition-all duration-200"
-                >
-                  {prompt}
-                </button>
-              ))}
+        <aside className="hidden lg:flex lg:flex-col w-72 border-l border-terminal-border bg-terminal-surface overflow-hidden">
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Sessions */}
+            <div className="p-4 border-b border-terminal-border">
+              <SessionsList
+                currentSessionId={activeSessionId}
+                onSessionSelect={handleSessionSelect}
+                onNewSession={handleNewSession}
+                refreshTrigger={sessionRefreshTrigger}
+              />
             </div>
-          </div>
 
-          {/* Quick stats */}
-          <div className="p-4 border-t border-terminal-border">
-            <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
-              Available Tools
-            </h2>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-terminal-bg px-2 py-1 rounded">
-                <span className="text-terminal-accent">19</span> Free
-              </div>
-              <div className="bg-terminal-bg px-2 py-1 rounded">
-                <span className="text-terminal-warning">5</span> Coming
+            {/* Suggestions */}
+            <div className="p-4 border-b border-terminal-border">
+              <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
+                Try Asking
+              </h2>
+              <div className="space-y-2">
+                {PROMPT_SUGGESTIONS.map((prompt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handlePromptClick(prompt)}
+                    className="w-full text-left text-sm text-terminal-text hover:text-terminal-accent 
+                             bg-terminal-bg hover:bg-terminal-border/50 
+                             px-3 py-2 rounded transition-all duration-200"
+                  >
+                    {prompt}
+                  </button>
+                ))}
               </div>
             </div>
-            <a 
-              href="/tools" 
-              className="block mt-3 text-xs text-terminal-muted hover:text-terminal-accent"
-            >
-              View all tools →
-            </a>
+
+            {/* Quick stats */}
+            <div className="p-4">
+              <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
+                Available Tools
+              </h2>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-terminal-bg px-2 py-1 rounded">
+                  <span className="text-terminal-accent">28</span> Free
+                </div>
+                <div className="bg-terminal-bg px-2 py-1 rounded">
+                  <span className="text-terminal-warning">4</span> Coming
+                </div>
+              </div>
+              <a 
+                href="/tools" 
+                className="block mt-3 text-xs text-terminal-muted hover:text-terminal-accent"
+              >
+                View all tools →
+              </a>
+            </div>
           </div>
         </aside>
 
@@ -189,7 +192,7 @@ function HomeContent() {
           
           {/* Drawer */}
           <aside 
-            className={`absolute top-0 right-0 h-full w-80 max-w-[85vw] bg-terminal-surface border-l border-terminal-border flex flex-col transform transition-transform duration-300 ease-out ${
+            className={`absolute top-0 right-0 h-full w-80 max-w-[85vw] bg-terminal-surface border-l border-terminal-border flex flex-col overflow-hidden transform transition-transform duration-300 ease-out ${
               isMobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'
             }`}
           >
@@ -216,59 +219,62 @@ function HomeContent() {
               </button>
             </div>
 
-            {/* Sessions */}
-            <div className="p-4 border-b border-terminal-border">
-              <SessionsList
-                currentSessionId={activeSessionId}
-                onSessionSelect={handleSessionSelect}
-                onNewSession={() => {
-                  handleNewSession();
-                  setIsMobileSidebarOpen(false);
-                }}
-                refreshTrigger={sessionRefreshTrigger}
-              />
-            </div>
-
-            {/* Suggestions */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
-                Try Asking
-              </h2>
-              <div className="space-y-2">
-                {PROMPT_SUGGESTIONS.map((prompt, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handlePromptClick(prompt)}
-                    className="w-full text-left text-sm text-terminal-text hover:text-terminal-accent 
-                             bg-terminal-bg hover:bg-terminal-border/50 
-                             px-3 py-2 rounded transition-all duration-200"
-                  >
-                    {prompt}
-                  </button>
-                ))}
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Sessions */}
+              <div className="p-4 border-b border-terminal-border">
+                <SessionsList
+                  currentSessionId={activeSessionId}
+                  onSessionSelect={handleSessionSelect}
+                  onNewSession={() => {
+                    handleNewSession();
+                    setIsMobileSidebarOpen(false);
+                  }}
+                  refreshTrigger={sessionRefreshTrigger}
+                />
               </div>
-            </div>
 
-            {/* Quick stats */}
-            <div className="p-4 border-t border-terminal-border">
-              <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
-                Available Tools
-              </h2>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-terminal-bg px-2 py-1 rounded">
-                  <span className="text-terminal-accent">19</span> Free
-                </div>
-                <div className="bg-terminal-bg px-2 py-1 rounded">
-                  <span className="text-terminal-warning">5</span> Coming
+              {/* Suggestions */}
+              <div className="p-4 border-b border-terminal-border">
+                <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
+                  Try Asking
+                </h2>
+                <div className="space-y-2">
+                  {PROMPT_SUGGESTIONS.map((prompt, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handlePromptClick(prompt)}
+                      className="w-full text-left text-sm text-terminal-text hover:text-terminal-accent 
+                               bg-terminal-bg hover:bg-terminal-border/50 
+                               px-3 py-2 rounded transition-all duration-200"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <a 
-                href="/tools" 
-                className="block mt-3 text-xs text-terminal-muted hover:text-terminal-accent"
-                onClick={() => setIsMobileSidebarOpen(false)}
-              >
-                View all tools →
-              </a>
+
+              {/* Quick stats */}
+              <div className="p-4">
+                <h2 className="text-sm font-semibold text-terminal-muted mb-3 uppercase tracking-wider">
+                  Available Tools
+                </h2>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-terminal-bg px-2 py-1 rounded">
+                    <span className="text-terminal-accent">28</span> Free
+                  </div>
+                  <div className="bg-terminal-bg px-2 py-1 rounded">
+                    <span className="text-terminal-warning">4</span> Coming
+                  </div>
+                </div>
+                <a 
+                  href="/tools" 
+                  className="block mt-3 text-xs text-terminal-muted hover:text-terminal-accent"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                >
+                  View all tools →
+                </a>
+              </div>
             </div>
           </aside>
         </div>

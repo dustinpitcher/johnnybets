@@ -13,8 +13,6 @@ const ICON_MAP: Record<string, string> = {
   'trending-up': '📈',
   'newspaper': '📰',
   'shield-check': '🛡️',
-  'floppy-disk': '💾',
-  'file-text': '📄',
   'user-chart': '👤',
   'shield': '🛡️',
   'cloud-sun': '⛅',

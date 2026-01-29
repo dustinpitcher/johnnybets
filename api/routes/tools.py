@@ -126,6 +126,7 @@ async def get_tool_stats():
         "by_category": {
             "general": len(registry.get_tools_by_category(ToolCategory.GENERAL)),
             "nfl": len(registry.get_tools_by_category(ToolCategory.NFL)),
+            "nba": len(registry.get_tools_by_category(ToolCategory.NBA)),
             "nhl": len(registry.get_tools_by_category(ToolCategory.NHL)),
             "mlb": len(registry.get_tools_by_category(ToolCategory.MLB)),
         },

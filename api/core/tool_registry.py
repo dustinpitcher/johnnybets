@@ -158,26 +158,6 @@ TOOLS: Dict[str, Tool] = {
         sports=["nfl", "nba", "nhl", "mlb"],
         function_name="validate_betting_edge",
     ),
-    "save_betting_strategy": Tool(
-        id="save_betting_strategy",
-        name="Save Strategy",
-        description="Save betting strategies to files for future reference and tracking.",
-        category=ToolCategory.GENERAL,
-        status=ToolStatus.FREE,
-        icon="floppy-disk",
-        sports=["nfl", "nhl", "mlb", "nba"],
-        function_name="save_betting_strategy",
-    ),
-    "save_analysis_report": Tool(
-        id="save_analysis_report",
-        name="Save Report",
-        description="Save analysis reports in markdown format for documentation.",
-        category=ToolCategory.GENERAL,
-        status=ToolStatus.FREE,
-        icon="file-text",
-        sports=["nfl", "nhl", "mlb", "nba"],
-        function_name="save_analysis_report",
-    ),
     
     # -------------------------------------------------------------------------
     # NFL TOOLS
