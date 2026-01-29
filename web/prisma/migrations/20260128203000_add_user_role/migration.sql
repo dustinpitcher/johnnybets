@@ -1,5 +1,13 @@
--- Add role column to users table
-ALTER TABLE "users" ADD COLUMN "role" TEXT NOT NULL DEFAULT 'user';
+-- Add role column to users table (idempotent)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'role'
+    ) THEN
+        ALTER TABLE "users" ADD COLUMN "role" TEXT NOT NULL DEFAULT 'user';
+    END IF;
+END $$;
 
 -- Create message_feedbacks table if it doesn't exist
 CREATE TABLE IF NOT EXISTS "message_feedbacks" (
