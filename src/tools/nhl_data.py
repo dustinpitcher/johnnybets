@@ -19,6 +19,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import os
 
+# Import team normalization utilities
+from src.utils.normalizer import normalize_nhl_team, get_nhl_team_full_name
+
 # MoneyPuck CSV URLs
 # Season summary data (aggregated)
 MONEYPUCK_BASE_URL = "https://moneypuck.com/moneypuck/playerData"
@@ -262,48 +265,77 @@ class NHLDataFetcher:
         """
         Get comprehensive goalie profile with betting-relevant metrics.
         
+        Uses multi-season fallback to find goalies who may not appear in current season data.
+        
         Args:
             goalie_name: Goalie name (flexible matching)
-            season: Season year
+            season: Season year (optional, will try multiple seasons if not specified)
             
         Returns:
             GoalieProfile dataclass or None if not found
         """
-        season = season or self.seasons[0]
-        cache_key = f"{goalie_name}_{season}"
+        # Determine which seasons to try
+        if season:
+            seasons_to_try = [season]
+        else:
+            seasons_to_try = self.seasons  # e.g., [2025, 2024]
         
-        if cache_key in self._goalie_profiles_cache:
-            return self._goalie_profiles_cache[cache_key]
-        
-        # Get season stats
-        goalies_df = self.get_goalie_season_stats(season)
-        if goalies_df.empty:
-            return None
-        
-        # Flexible name matching
-        name_lower = goalie_name.lower()
-        mask = goalies_df['name'].str.lower().str.contains(name_lower, na=False)
-        
-        if not mask.any():
-            # Try last name only
-            last_name = goalie_name.split()[-1].lower() if " " in goalie_name else name_lower
-            mask = goalies_df['name'].str.lower().str.contains(last_name, na=False)
-        
-        if not mask.any():
-            print(f"   ⚠️ Goalie not found: {goalie_name}")
-            return None
-        
-        # MoneyPuck has multiple rows per goalie (situation: all, 5on5, 4on5, 5on4, other)
-        # We want the 'all' situation for total stats
-        goalie_rows = goalies_df[mask]
-        if 'situation' in goalie_rows.columns:
-            all_situation = goalie_rows[goalie_rows['situation'] == 'all']
-            if not all_situation.empty:
-                goalie = all_situation.iloc[0]
+        # Try each season until we find the goalie
+        for try_season in seasons_to_try:
+            cache_key = f"{goalie_name}_{try_season}"
+            
+            if cache_key in self._goalie_profiles_cache:
+                return self._goalie_profiles_cache[cache_key]
+            
+            # Get season stats
+            goalies_df = self.get_goalie_season_stats(try_season)
+            if goalies_df.empty:
+                print(f"   [NHL] No goalie data for season {try_season}")
+                continue
+            
+            # Flexible name matching
+            name_lower = goalie_name.lower()
+            mask = goalies_df['name'].str.lower().str.contains(name_lower, na=False)
+            
+            if not mask.any():
+                # Try last name only
+                last_name = goalie_name.split()[-1].lower() if " " in goalie_name else name_lower
+                mask = goalies_df['name'].str.lower().str.contains(last_name, na=False)
+            
+            if not mask.any():
+                # Try without accents/special characters
+                import unicodedata
+                def remove_accents(s):
+                    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+                name_normalized = remove_accents(name_lower)
+                mask = goalies_df['name'].apply(lambda x: remove_accents(str(x).lower())).str.contains(name_normalized, na=False)
+            
+            if not mask.any():
+                print(f"   [NHL] Goalie '{goalie_name}' not found in {try_season} season, trying next...")
+                continue
+            
+            # Found the goalie - extract data
+            goalie_rows = goalies_df[mask]
+            
+            # MoneyPuck has multiple rows per goalie (situation: all, 5on5, 4on5, 5on4, other)
+            # We want the 'all' situation for total stats
+            if 'situation' in goalie_rows.columns:
+                all_situation = goalie_rows[goalie_rows['situation'] == 'all']
+                if not all_situation.empty:
+                    goalie = all_situation.iloc[0]
+                else:
+                    goalie = goalie_rows.iloc[0]
             else:
                 goalie = goalie_rows.iloc[0]
+            
+            # Use this season for the profile
+            season = try_season
+            cache_key = f"{goalie_name}_{season}"  # Update cache key with found season
+            break
         else:
-            goalie = goalie_rows.iloc[0]
+            # No season had the goalie
+            print(f"   [NHL] Goalie not found in any season {seasons_to_try}: {goalie_name}")
+            return None
         
         # MoneyPuck column names:
         # - ongoal: shots on goal (against)
@@ -516,7 +548,23 @@ class NHLDataFetcher:
         return self._team_cache[season]
     
     def get_team_profile(self, team: str, season: int = None) -> Optional[TeamProfile]:
-        """Get team profile with Corsi and xG metrics."""
+        """
+        Get team profile with Corsi and xG metrics.
+        
+        Args:
+            team: Team abbreviation or name (will be normalized)
+            season: Season year
+            
+        Returns:
+            TeamProfile or None
+        """
+        # Normalize team input
+        normalized = normalize_nhl_team(team)
+        if not normalized:
+            print(f"   [NHL] get_team_profile: Could not normalize team '{team}'")
+            return None
+        
+        team = normalized
         season = season or self.seasons[0]
         cache_key = f"{team}_{season}"
         
@@ -529,10 +577,16 @@ class NHLDataFetcher:
             # Try aggregating from skater data
             return self._build_team_profile_from_skaters(team, season)
         
+        # Try exact match first
         team_upper = team.upper()
         mask = teams_df['team'].str.upper() == team_upper
         
         if not mask.any():
+            # Try partial match (MoneyPuck might use different abbreviations)
+            mask = teams_df['team'].str.upper().str.contains(team_upper, na=False)
+        
+        if not mask.any():
+            print(f"   [NHL] get_team_profile: Team '{team}' not found in MoneyPuck data for {season}")
             return None
         
         team_data = teams_df[mask].iloc[0]

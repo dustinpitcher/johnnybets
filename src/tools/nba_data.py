@@ -31,6 +31,9 @@ from nba_api.stats.endpoints import (
 )
 from nba_api.stats.static import teams, players
 
+# Import team normalization utilities
+from src.utils.normalizer import normalize_nba_team, get_nba_team_full_name
+
 # Singleton fetcher instance to avoid duplicate API calls
 _FETCHER_INSTANCE: 'NBADataFetcher' = None
 
@@ -242,22 +245,49 @@ class NBADataFetcher:
         
         print(f"🏀 NBADataFetcher initialized for {self.season} season")
     
-    def _get_team_id(self, team_abbrev: str) -> Optional[int]:
-        """Get NBA team ID from abbreviation."""
-        team_abbrev = team_abbrev.upper()
+    def _get_team_id(self, team_input: str) -> Optional[int]:
+        """
+        Get NBA team ID with robust matching.
+        
+        Uses the normalizer to handle abbreviations, full names, cities, and nicknames.
+        
+        Args:
+            team_input: Team identifier in any format (e.g., "WAS", "Washington Wizards", "wizards")
+            
+        Returns:
+            NBA team ID or None if not found
+        """
+        if not team_input:
+            return None
+        
+        # Normalize to standard abbreviation first
+        abbrev = normalize_nba_team(team_input)
+        if not abbrev:
+            print(f"   [NBA] Could not normalize team: {team_input}")
+            return None
+        
+        # Get nba_api team data
         nba_teams = teams.get_teams()
         
+        # Try direct abbreviation match (nba_api format)
         for team in nba_teams:
-            if team['abbreviation'].upper() == team_abbrev:
+            if team['abbreviation'].upper() == abbrev:
                 return team['id']
         
-        # Try full name lookup
-        team_name = TEAM_ABBREV_MAP.get(team_abbrev)
-        if team_name:
+        # Try full name match from our mapping
+        full_name = TEAM_ABBREV_MAP.get(abbrev)
+        if full_name:
             for team in nba_teams:
-                if team['full_name'] == team_name:
+                # Case-insensitive comparison
+                if team['full_name'].lower() == full_name.lower():
                     return team['id']
         
+        # Last resort: try partial match on full name
+        for team in nba_teams:
+            if abbrev.lower() in team['full_name'].lower() or team['abbreviation'].upper() == abbrev:
+                return team['id']
+        
+        print(f"   [NBA] Team not found in nba_api: {team_input} -> {abbrev}")
         return None
     
     def _get_player_id(self, player_name: str) -> Optional[int]:
@@ -366,19 +396,25 @@ class NBADataFetcher:
         Get team defensive profile with DvP rankings.
         
         Args:
-            team: Team abbreviation (e.g., "BOS", "LAL")
+            team: Team abbreviation or name (will be normalized)
             
         Returns:
             NBADefenseProfile or None
         """
-        team = team.upper()
+        # Normalize team input first
+        normalized = normalize_nba_team(team)
+        if not normalized:
+            print(f"   [NBA] get_defense_profile: Could not normalize team '{team}'")
+            return None
+        
+        team = normalized
         
         if team in self._defense_profiles_cache:
             return self._defense_profiles_cache[team]
         
         team_id = self._get_team_id(team)
         if not team_id:
-            print(f"   ⚠️ Team not found: {team}")
+            print(f"   [NBA] get_defense_profile: No team ID found for '{team}'")
             return None
         
         team_stats = self.get_team_stats()
@@ -467,22 +503,30 @@ class NBADataFetcher:
         Get team pace and tempo metrics.
         
         Args:
-            team: Team abbreviation
+            team: Team abbreviation (or any format - will be normalized)
             
         Returns:
             NBATeamPace or None
         """
-        team = team.upper()
+        # Normalize team input first
+        normalized = normalize_nba_team(team)
+        if not normalized:
+            print(f"   [NBA] get_team_pace: Could not normalize team '{team}'")
+            return None
+        
+        team = normalized
         
         if team in self._team_pace_cache:
             return self._team_pace_cache[team]
         
         team_id = self._get_team_id(team)
         if not team_id:
+            print(f"   [NBA] get_team_pace: No team ID found for '{team}'")
             return None
         
         team_stats = self.get_team_stats()
         if team_stats.empty:
+            print(f"   [NBA] get_team_pace: No team stats available")
             return None
         
         # Sort by pace to get ranking
@@ -490,6 +534,7 @@ class NBADataFetcher:
         
         team_row = team_stats[team_stats['TEAM_ID'] == team_id]
         if team_row.empty:
+            print(f"   [NBA] get_team_pace: Team ID {team_id} not found in stats (team: {team})")
             return None
         
         row = team_row.iloc[0]

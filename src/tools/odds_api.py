@@ -56,10 +56,25 @@ class OddsAPIClient:
         self.remaining_requests = response.headers.get("x-requests-remaining")
         self.used_requests = response.headers.get("x-requests-used")
         
+        # Handle errors - The Odds API uses 401 for both invalid key AND quota exhausted
         if response.status_code == 401:
-            raise ValueError("Invalid API key")
+            try:
+                error_data = response.json()
+                error_code = error_data.get("error_code", "")
+                if error_code == "OUT_OF_USAGE_CREDITS":
+                    raise RuntimeError(
+                        "Odds API monthly quota exhausted (500 free credits/month). "
+                        "Quota resets on the 1st of each month. "
+                        "Consider upgrading at https://the-odds-api.com/#get-access"
+                    )
+                elif error_code == "DEACTIVATED_KEY":
+                    raise ValueError("API key has been deactivated. Please get a new key.")
+                else:
+                    raise ValueError("Invalid API key")
+            except (ValueError, KeyError):
+                raise ValueError("Invalid API key")
         elif response.status_code == 429:
-            raise RuntimeError("API quota exceeded")
+            raise RuntimeError("API rate limit exceeded (30 requests/second). Please slow down.")
         elif response.status_code != 200:
             raise RuntimeError(f"API error {response.status_code}: {response.text}")
             
