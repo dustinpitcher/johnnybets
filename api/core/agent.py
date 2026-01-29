@@ -546,14 +546,15 @@ def get_nhl_goalie_profile(goalie_name: str) -> str:
         if not profile:
             return json.dumps({"status": "error", "message": f"Goalie not found: {goalie_name}"})
         
+        # Convert numpy types to native Python for JSON serialization
         return json.dumps({
             "status": "success",
-            "goalie": profile.name,
-            "team": profile.team,
-            "games_played": profile.games_played,
-            "save_pct": profile.save_pct,
-            "xg_save_pct": profile.xg_save_pct,
-            "luck_factor": profile.luck_factor,
+            "goalie": str(profile.name),
+            "team": str(profile.team),
+            "games_played": int(profile.games_played),
+            "save_pct": float(profile.save_pct),
+            "xg_save_pct": float(profile.xg_save_pct),
+            "luck_factor": float(profile.luck_factor),
         }, indent=2)
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
@@ -569,13 +570,14 @@ def get_nhl_team_profile(team: str) -> str:
         if not profile:
             return json.dumps({"status": "error", "message": f"Team not found: {team}"})
         
+        # Convert numpy types to native Python for JSON serialization
         return json.dumps({
             "status": "success",
-            "team": profile.team,
-            "games_played": profile.games_played,
-            "corsi_pct": profile.corsi_pct,
-            "xg_for_per_game": profile.xg_for_per_game,
-            "xg_against_per_game": profile.xg_against_per_game,
+            "team": str(profile.team),
+            "games_played": int(profile.games_played),
+            "corsi_pct": float(profile.corsi_pct),
+            "xg_for_per_game": float(profile.xg_for_per_game),
+            "xg_against_per_game": float(profile.xg_against_per_game),
         }, indent=2)
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)}, indent=2)
