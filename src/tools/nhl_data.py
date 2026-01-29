@@ -13,6 +13,8 @@ Similar pattern to nfl_data.py using nflverse.
 
 import pandas as pd
 import numpy as np
+import requests
+import io
 from typing import Optional, List, Tuple
 from functools import lru_cache
 from dataclasses import dataclass, field
@@ -21,6 +23,13 @@ import os
 
 # Import team normalization utilities
 from src.utils.normalizer import normalize_nhl_team, get_nhl_team_full_name
+
+# Browser-like headers to avoid Cloudflare 403 blocks
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/csv,text/plain,*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 # MoneyPuck CSV URLs
 # Season summary data (aggregated)
@@ -177,7 +186,11 @@ class NHLDataFetcher:
         os.makedirs(CACHE_DIR, exist_ok=True)
     
     def _get_cached_or_download(self, url: str, cache_name: str, max_age_hours: int = 24) -> pd.DataFrame:
-        """Download data or use cached version if fresh enough."""
+        """Download data or use cached version if fresh enough.
+        
+        Uses requests with browser headers to avoid Cloudflare 403 blocks
+        that occur with pandas' default urllib User-Agent.
+        """
         cache_path = os.path.join(CACHE_DIR, f"{cache_name}.csv")
         
         # Check if cache exists and is fresh
@@ -191,10 +204,23 @@ class NHLDataFetcher:
         
         print(f"   ⬇️ Downloading: {url}")
         try:
-            df = pd.read_csv(url)
+            # Use requests with browser headers to avoid Cloudflare 403
+            response = requests.get(url, headers=BROWSER_HEADERS, timeout=30)
+            response.raise_for_status()
+            
+            # Parse CSV from response text
+            df = pd.read_csv(io.StringIO(response.text))
+            
             # Cache for next time
             df.to_csv(cache_path, index=False)
             return df
+        except requests.exceptions.HTTPError as e:
+            print(f"   ⚠️ HTTP error downloading {url}: {e.response.status_code}")
+            # Try to use stale cache if download fails
+            if os.path.exists(cache_path):
+                print(f"   📂 Using stale cache: {cache_name}")
+                return pd.read_csv(cache_path)
+            return pd.DataFrame()
         except Exception as e:
             print(f"   ⚠️ Failed to download {url}: {e}")
             # Try to use stale cache if download fails

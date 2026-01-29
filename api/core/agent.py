@@ -35,7 +35,7 @@ from src.tools.file_tools import save_strategy, save_report
 from src.analysis.contextual_props import ContextualPropsAnalyzer
 from src.tools.nfl_data import NFLDataFetcher
 from src.analysis.edge_validator import validate_bet
-from src.tools.nhl_data import NHLDataFetcher
+from src.tools.nhl_data import NHLDataFetcher, get_nhl_fetcher
 from src.analysis.goalie_props import GoaliePropsAnalyzer
 from src.analysis.team_matchup import TeamMatchupAnalyzer
 from src.tools.nhl_referees import NHLRefereeDatabase
@@ -540,7 +540,7 @@ def analyze_goalie_props(
 def get_nhl_goalie_profile(goalie_name: str) -> str:
     """Get detailed goalie profile with save %, xGSV%, and B2B splits."""
     try:
-        fetcher = NHLDataFetcher()
+        fetcher = get_nhl_fetcher()  # Use singleton to share cache
         profile = fetcher.get_goalie_profile(goalie_name)
         
         if not profile:
@@ -563,7 +563,7 @@ def get_nhl_goalie_profile(goalie_name: str) -> str:
 def get_nhl_team_profile(team: str) -> str:
     """Get NHL team analytics profile with Corsi, xG, and possession metrics."""
     try:
-        fetcher = NHLDataFetcher()
+        fetcher = get_nhl_fetcher()  # Use singleton to share cache
         profile = fetcher.get_team_profile(team)
         
         if not profile:
@@ -1028,6 +1028,9 @@ def create_agent(model: str = None, reasoning: str = None):
     Args:
         model: OpenRouter model to use
         reasoning: Reasoning mode (high, medium, low, none)
+        
+    Returns:
+        Tuple of (agent, selected_model) - agent and the actual model used
     """
     selected_model = model or os.getenv("BETTING_AGENT_MODEL", "x-ai/grok-4.1-fast")
     
@@ -1056,7 +1059,7 @@ def create_agent(model: str = None, reasoning: str = None):
     llm = ChatOpenAI(**llm_kwargs)
     tools = get_all_tools()
     
-    return create_react_agent(llm, tools)
+    return create_react_agent(llm, tools), selected_model
 
 
 @dataclass
@@ -1081,8 +1084,9 @@ class ChatSession:
         system_prompt = SYSTEM_PROMPT.format(session_time=session_time)
         self.messages = [SystemMessage(content=system_prompt)]
         
-        # Create agent
-        self._agent = create_agent(model=self.model, reasoning=self.reasoning)
+        # Create agent and capture actual model used (for trace logging)
+        self._agent, actual_model = create_agent(model=self.model, reasoning=self.reasoning)
+        self.model = actual_model  # Store actual model for trace logging
     
     async def chat(self, user_input: str) -> str:
         """Send a message and get a response."""

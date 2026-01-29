@@ -37,8 +37,16 @@ class XSearchClient:
             "Authorization": f"Bearer {self.api_key}"
         }
     
-    def _make_request(self, messages: List[Dict], tools: List[Dict]) -> Dict[str, Any]:
-        """Make a request to the xAI Responses API with tools."""
+    def _make_request(self, messages: List[Dict], tools: List[Dict], retries: int = 1) -> Dict[str, Any]:
+        """Make a request to the xAI Responses API with tools.
+        
+        Args:
+            messages: Chat messages
+            tools: Tools to enable
+            retries: Number of retry attempts on timeout (default 1)
+        """
+        import time
+        
         payload = {
             "model": self.MODEL,
             "input": messages,
@@ -46,14 +54,28 @@ class XSearchClient:
             "temperature": 0.7,
         }
         
-        response = requests.post(
-            f"{self.base_url}/responses",
-            headers=self.headers,
-            json=payload,
-            timeout=60
-        )
-        response.raise_for_status()
-        return response.json()
+        last_error = None
+        for attempt in range(retries + 1):
+            try:
+                response = requests.post(
+                    f"{self.base_url}/responses",
+                    headers=self.headers,
+                    json=payload,
+                    timeout=20  # Reduced from 60s to avoid long waits
+                )
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.Timeout as e:
+                last_error = e
+                if attempt < retries:
+                    print(f"   [X Search] Timeout, retrying in 5s... (attempt {attempt + 1}/{retries + 1})")
+                    time.sleep(5)
+            except requests.exceptions.RequestException as e:
+                # Don't retry on non-timeout errors
+                raise
+        
+        # All retries exhausted
+        raise last_error
     
     def _extract_text_response(self, response: Dict) -> str:
         """Extract the text response from the API response."""
