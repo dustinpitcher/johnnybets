@@ -4,8 +4,8 @@ compatibility_date = "2024-01-01"
 
 # Routes - uncomment and configure when ready to deploy
 # routes = [
-#   { pattern = "johnnybets.com/*", zone_name = "johnnybets.com" },
-#   { pattern = "www.johnnybets.com/*", zone_name = "johnnybets.com" }
+#   { pattern = "johnnybets.ai/*", zone_name = "johnnybets.ai" },
+#   { pattern = "www.johnnybets.ai/*", zone_name = "johnnybets.ai" }
 # ]
 
 [vars]
@@ -22,4 +22,4 @@ MAINTENANCE_MODE = "false"
 ESTIMATED_TIME = "shortly"
 
 # Contact email for urgent issues
-CONTACT_EMAIL = "support@johnnybets.com"
+CONTACT_EMAIL = "support@johnnybets.ai"

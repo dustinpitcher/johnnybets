@@ -18,8 +18,8 @@ A Cloudflare Worker that displays a maintenance page when activated. Can be quic
 3. Configure routes in `wrangler.toml`:
    ```toml
    routes = [
-     { pattern = "johnnybets.com/*", zone_name = "johnnybets.com" },
-     { pattern = "www.johnnybets.com/*", zone_name = "johnnybets.com" }
+     { pattern = "johnnybets.ai/*", zone_name = "johnnybets.ai" },
+     { pattern = "www.johnnybets.ai/*", zone_name = "johnnybets.ai" }
    ]
    ```
 
@@ -62,7 +62,7 @@ Same as above, but set `MAINTENANCE_MODE` to `false`.
 | `ALLOWED_IPS` | Comma-separated IPs that bypass maintenance | `""` |
 | `ALLOWED_PATHS` | Comma-separated paths that bypass maintenance | `""` |
 | `ESTIMATED_TIME` | Time estimate shown to users | `"shortly"` |
-| `CONTACT_EMAIL` | Contact email for support | `"support@johnnybets.com"` |
+| `CONTACT_EMAIL` | Contact email for support | `"support@johnnybets.ai"` |
 
 ## Bypass Maintenance
 

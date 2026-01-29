@@ -54,7 +54,7 @@ export default {
 
 function generateMaintenancePage(env) {
   const estimatedTime = env.ESTIMATED_TIME || 'shortly';
-  const contactEmail = env.CONTACT_EMAIL || 'support@johnnybets.com';
+  const contactEmail = env.CONTACT_EMAIL || 'support@johnnybets.ai';
   
   return `<!DOCTYPE html>
 <html lang="en">
