@@ -4,11 +4,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSession } from 'next-auth/react';
-import { createSession as createApiSession, streamMessage } from '@/lib/api';
+import { createSession as createApiSession, streamMessage, fetchDailyIntro } from '@/lib/api';
 import * as sessionStorage from '@/lib/sessions';
 import MessageActions from './MessageActions';
 import Modal from './Modal';
 import InviteGateContent from './InviteGateContent';
+import { FALLBACK_WELCOME_MESSAGE } from '@/lib/welcome-fallback';
 
 interface Message {
   id: string;
@@ -18,21 +19,21 @@ interface Message {
   isStreaming?: boolean;
 }
 
-const WELCOME_MESSAGE: Message = {
-  id: 'welcome',
-  role: 'system',
-  content: `Oh good, another person who wants to beat the books. At least you came to someone who knows what they're doing. I'm **JohnnyBets**.
+// Session storage key for caching daily intro
+const DAILY_INTRO_CACHE_KEY = 'johnnybets_daily_intro';
+const DAILY_INTRO_DATE_KEY = 'johnnybets_daily_intro_date';
 
-Look, here's the deal:
-- 📊 **Live Odds** from every book that matters
-- 🏈 **Super Bowl LX** analysis — Pats vs Seahawks, and yes I have thoughts
-- 🎯 **Prop Alpha** player analysis using actual data, not vibes
-- 🏒 **NHL Goalie Alpha** because save props are free money if you're not lazy
-- 📈 **Arbitrage Scanner** for people who like math over luck
+function createWelcomeMessage(content: string): Message {
+  return {
+    id: 'welcome',
+    role: 'system',
+    content,
+    timestamp: new Date(),
+  };
+}
 
-Ask me something. And please, make it interesting.`,
-  timestamp: new Date(),
-};
+// Static fallback for immediate display while fetching
+const FALLBACK_WELCOME: Message = createWelcomeMessage(FALLBACK_WELCOME_MESSAGE);
 
 interface TerminalProps {
   activeSessionId?: string | null;
@@ -54,7 +55,8 @@ export default function Terminal({
   const { data: authSession, status: authStatus } = useSession();
   const isAuthenticated = authStatus === 'authenticated';
   
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([FALLBACK_WELCOME]);
+  const [welcomeMessage, setWelcomeMessage] = useState<Message>(FALLBACK_WELCOME);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [apiSessionId, setApiSessionId] = useState<string | null>(null);
@@ -71,6 +73,54 @@ export default function Terminal({
   useEffect(() => {
     localSessionIdRef.current = localSessionId;
   }, [localSessionId]);
+
+  // Fetch daily intro on mount
+  useEffect(() => {
+    const loadDailyIntro = async () => {
+      try {
+        // Check cache first (browser sessionStorage)
+        const browserSessionStorage = typeof window !== 'undefined' ? window.sessionStorage : null;
+        const cachedDate = browserSessionStorage?.getItem(DAILY_INTRO_DATE_KEY);
+        const cachedContent = browserSessionStorage?.getItem(DAILY_INTRO_CACHE_KEY);
+        const today = new Date().toISOString().split('T')[0];
+        
+        if (cachedDate === today && cachedContent) {
+          const cachedMessage = createWelcomeMessage(cachedContent);
+          setWelcomeMessage(cachedMessage);
+          // Only update messages if we're still showing the initial fallback
+          setMessages(prev => {
+            if (prev.length === 1 && prev[0].id === 'welcome') {
+              return [cachedMessage];
+            }
+            return prev;
+          });
+          return;
+        }
+        
+        // Fetch fresh daily intro
+        const intro = await fetchDailyIntro();
+        const newMessage = createWelcomeMessage(intro.content);
+        
+        // Cache it in browser sessionStorage
+        browserSessionStorage?.setItem(DAILY_INTRO_DATE_KEY, intro.date);
+        browserSessionStorage?.setItem(DAILY_INTRO_CACHE_KEY, intro.content);
+        
+        setWelcomeMessage(newMessage);
+        // Only update messages if we're still showing the initial welcome
+        setMessages(prev => {
+          if (prev.length === 1 && prev[0].id === 'welcome') {
+            return [newMessage];
+          }
+          return prev;
+        });
+      } catch (error) {
+        console.error('Failed to fetch daily intro:', error);
+        // Keep using fallback, which is already set
+      }
+    };
+    
+    loadDailyIntro();
+  }, []);
 
   // Load session when activeSessionId changes from parent
   useEffect(() => {
@@ -98,22 +148,22 @@ export default function Terminal({
             content: m.content,
             timestamp: new Date(m.timestamp),
           }));
-          setMessages(loadedMessages.length > 0 ? loadedMessages : [WELCOME_MESSAGE]);
+          setMessages(loadedMessages.length > 0 ? loadedMessages : [welcomeMessage]);
         } else {
           // Session not found
-          setMessages([WELCOME_MESSAGE]);
+          setMessages([welcomeMessage]);
           setLocalSessionId(null);
         }
       };
       loadSession();
     } else if (activeSessionId === null) {
       // Explicitly null means new session - reset to welcome
-      setMessages([WELCOME_MESSAGE]);
+      setMessages([welcomeMessage]);
       setLocalSessionId(null);
       setApiSessionId(null);
     }
     // If activeSessionId is undefined (initial mount), don't reset
-  }, [activeSessionId, isAuthenticated, authStatus]);
+  }, [activeSessionId, isAuthenticated, authStatus, welcomeMessage]);
 
   // Scroll to bottom on new messages
   useEffect(() => {

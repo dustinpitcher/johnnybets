@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from api.routes import chat, tools, entities, payments, scores
+from api.routes import chat, tools, entities, payments, scores, daily_intro
 
 
 @asynccontextmanager
@@ -59,6 +59,7 @@ app.include_router(tools.router, prefix="/api")
 app.include_router(entities.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(scores.router, prefix="/api")
+app.include_router(daily_intro.router, prefix="/api")
 
 
 @app.get("/")

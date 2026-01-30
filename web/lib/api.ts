@@ -323,6 +323,27 @@ export async function voteForTool(toolId: string): Promise<{
 }
 
 // ============================================================================
+// Daily Intro
+// ============================================================================
+
+export interface DailyIntroResponse {
+  content: string;
+  generated_at: string;
+  games_featured: string[];
+  sports: string[];
+  date: string;
+}
+
+/**
+ * Fetch the daily intro message.
+ * 
+ * Returns the dynamically generated intro for today, or a fallback if not available.
+ */
+export async function fetchDailyIntro(): Promise<DailyIntroResponse> {
+  return fetchJSON<DailyIntroResponse>('/api/daily-intro');
+}
+
+// ============================================================================
 // Health Check
 // ============================================================================
 
