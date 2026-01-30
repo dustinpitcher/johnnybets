@@ -273,7 +273,19 @@ def find_arbitrage_opportunities(sport: str = "nfl") -> str:
 
 @tool
 def search_x_twitter(query: str) -> str:
-    """Search X/Twitter for real-time sports betting intel using Grok."""
+    """Search X/Twitter for sports betting intel - use only if necessary because the queries take a while.
+    
+    IMPORTANT: Use specialized tools FIRST, then use this only to fill gaps:
+    1. get_injury_updates(team, sport) - for injury/practice reports
+    2. get_line_movement_buzz(matchup) - for sharp money/steam moves
+    3. get_breaking_sports_news(sport) - for breaking news
+    
+    Only use search_x_twitter for custom queries not covered by the above,
+    such as specific player news, weather updates, or niche betting angles.
+    
+    Args:
+        query: Custom search query (be specific, include sport context)
+    """
     try:
         client = XSearchClient()
         return client.search(query, context="sports betting analysis")
@@ -284,11 +296,16 @@ def search_x_twitter(query: str) -> str:
 
 
 @tool
-def get_injury_updates(team: str) -> str:
-    """Get the latest injury news for a team from X/Twitter."""
+def get_injury_updates(team: str, sport: str = None) -> str:
+    """Get the latest injury news for a team from X/Twitter.
+    
+    Args:
+        team: Team name (e.g., "Blackhawks", "CHI")
+        sport: Optional sport for disambiguation (NHL, NBA, NFL, MLB)
+    """
     try:
         client = XSearchClient()
-        return client.get_injury_report(team)
+        return client.get_injury_report(team, sport=sport)
     except Exception as e:
         return f"Error fetching injury updates: {e}"
 
@@ -478,8 +495,29 @@ def validate_betting_edge(
                 weather_condition=weather_condition,
             )
         elif bet_type == "total":
+            # Auto-calculate hit rate if we have projection vs line but no explicit hit rate
+            if historical_hit_rate is None and projection is not None and line is not None:
+                diff = line - projection
+                # Heuristic: larger diff from projection = higher confidence
+                if is_over:
+                    # Over: when line is higher than projection, over is harder
+                    estimated_rate = 50 + (diff * 3)
+                else:
+                    # Under: when line is higher than projection, under is easier
+                    estimated_rate = 50 + (-diff * 3)
+                historical_hit_rate = max(45, min(65, estimated_rate))  # Clamp to reasonable range
+            
             if historical_hit_rate is None:
-                return "ERROR: For totals, provide historical_hit_rate"
+                return """ERROR: For totals, you must provide historical_hit_rate.
+
+This should be derived from your data analysis:
+- For pace/tempo analysis: Use the projected total vs line to estimate hit rate
+- For weather unders: Use historical under hit rate in similar conditions
+- Example: If projected total is 5.8 and line is 6.5, hit rate for under ~55-60%
+
+Typical ranges: 50-52% = marginal edge, 53-56% = solid edge, 57%+ = strong edge
+
+TIP: You can also provide 'projection' and 'line' and I'll estimate the hit rate."""
             result = validate_bet(
                 "total",
                 total=line or 40.5,
@@ -491,7 +529,16 @@ def validate_betting_edge(
             )
         elif bet_type == "prop":
             if projection is None or line is None:
-                return "ERROR: For props, provide both projection and line"
+                return """ERROR: For props, you must provide both projection and line.
+
+Required parameters:
+- projection: Your projected value for the player stat (e.g., 285 passing yards)
+- line: The betting line (e.g., 275.5)
+
+Optional but recommended:
+- is_over: True if betting OVER (default), False for UNDER
+- juice: The vig (default -110)
+- sample_size: Number of games in your sample (default 20)"""
             result = validate_bet(
                 "prop",
                 prop_type="player_prop",

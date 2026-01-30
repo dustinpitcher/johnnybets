@@ -43,6 +43,8 @@ class Tool:
     sports: List[str]
     # For agent binding
     function_name: Optional[str] = None
+    # Document tool parameters (required/optional, types, descriptions)
+    parameters: Optional[Dict[str, Dict[str, Any]]] = None
     # For roadmap items
     eta: Optional[str] = None
     # For premium items (future)
@@ -55,7 +57,7 @@ class Tool:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""
-        return {
+        result = {
             "id": self.id,
             "name": self.name,
             "description": self.description,
@@ -68,6 +70,9 @@ class Tool:
             "price_tier": self.price_tier,
             "votes": self.votes,
         }
+        if self.parameters:
+            result["parameters"] = self.parameters
+        return result
 
 
 # =============================================================================
@@ -127,6 +132,10 @@ TOOLS: Dict[str, Tool] = {
         icon="bandage",
         sports=["nfl", "nhl", "mlb", "nba"],
         function_name="get_injury_updates",
+        parameters={
+            "team": {"required": True, "type": "str", "description": "Team name or abbreviation (e.g., 'Blackhawks', 'CHI', 'Chiefs')"},
+            "sport": {"required": False, "type": "str", "options": ["NHL", "NBA", "NFL", "MLB"], "description": "Sport for disambiguation when team abbreviation is ambiguous (e.g., CHI = Bulls or Blackhawks)"},
+        },
     ),
     "get_line_movement_buzz": Tool(
         id="get_line_movement_buzz",
@@ -157,6 +166,20 @@ TOOLS: Dict[str, Tool] = {
         icon="shield-check",
         sports=["nfl", "nba", "nhl", "mlb"],
         function_name="validate_betting_edge",
+        parameters={
+            "bet_type": {"required": True, "type": "str", "options": ["spread", "total", "prop"], "description": "Type of bet to validate"},
+            "historical_hit_rate": {"required": "for totals", "type": "float", "description": "Hit rate from data analysis (0-100). Can be auto-calculated from projection/line."},
+            "projection": {"required": "for props, optional for totals", "type": "float", "description": "Your projected value for the stat"},
+            "line": {"required": "for props, optional for totals", "type": "float", "description": "The betting line"},
+            "is_over": {"required": False, "type": "bool", "default": True, "description": "True if betting OVER, False for UNDER"},
+            "juice": {"required": False, "type": "int", "default": -110, "description": "The vig/juice on the bet"},
+            "sample_size": {"required": False, "type": "int", "default": 20, "description": "Number of games in your analysis sample"},
+            "is_favorite": {"required": False, "type": "bool", "default": False, "description": "For spreads: True if betting the favorite"},
+            "is_playoff": {"required": False, "type": "bool", "default": False, "description": "For spreads: True if playoff game (favorites cover <45%!)"},
+            "is_home": {"required": False, "type": "bool", "default": False, "description": "For spreads: True if betting home team"},
+            "public_pct": {"required": False, "type": "float", "description": "% of public money on this side (>60% = warning)"},
+            "weather_condition": {"required": False, "type": "str", "options": ["cold_35F", "wind_15mph", "snow", "rain"], "description": "Weather condition if applicable"},
+        },
     ),
     
     # -------------------------------------------------------------------------

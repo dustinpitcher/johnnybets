@@ -40,39 +40,8 @@ _FETCHER_INSTANCE: 'NBADataFetcher' = None
 # Local cache directory
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "nba_cache")
 
-# NBA team abbreviations mapping (nba_api uses different format)
-TEAM_ABBREV_MAP = {
-    "ATL": "Atlanta Hawks",
-    "BOS": "Boston Celtics",
-    "BKN": "Brooklyn Nets",
-    "CHA": "Charlotte Hornets",
-    "CHI": "Chicago Bulls",
-    "CLE": "Cleveland Cavaliers",
-    "DAL": "Dallas Mavericks",
-    "DEN": "Denver Nuggets",
-    "DET": "Detroit Pistons",
-    "GSW": "Golden State Warriors",
-    "HOU": "Houston Rockets",
-    "IND": "Indiana Pacers",
-    "LAC": "LA Clippers",
-    "LAL": "Los Angeles Lakers",
-    "MEM": "Memphis Grizzlies",
-    "MIA": "Miami Heat",
-    "MIL": "Milwaukee Bucks",
-    "MIN": "Minnesota Timberwolves",
-    "NOP": "New Orleans Pelicans",
-    "NYK": "New York Knicks",
-    "OKC": "Oklahoma City Thunder",
-    "ORL": "Orlando Magic",
-    "PHI": "Philadelphia 76ers",
-    "PHX": "Phoenix Suns",
-    "POR": "Portland Trail Blazers",
-    "SAC": "Sacramento Kings",
-    "SAS": "San Antonio Spurs",
-    "TOR": "Toronto Raptors",
-    "UTA": "Utah Jazz",
-    "WAS": "Washington Wizards",
-}
+# NOTE: Team abbreviation mapping moved to src/utils/normalizer.py
+# Use normalize_nba_team() and get_nba_team_full_name() for team lookups
 
 # Position mapping for DvP
 POSITION_MAP = {
@@ -274,8 +243,8 @@ class NBADataFetcher:
             if team['abbreviation'].upper() == abbrev:
                 return team['id']
         
-        # Try full name match from our mapping
-        full_name = TEAM_ABBREV_MAP.get(abbrev)
+        # Try full name match from normalizer
+        full_name = get_nba_team_full_name(abbrev)
         if full_name:
             for team in nba_teams:
                 # Case-insensitive comparison

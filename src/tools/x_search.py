@@ -11,8 +11,42 @@ Uses Grok's native X search tool for real-time sports betting intel:
 Reference: https://docs.x.ai/docs/guides/tools/overview
 """
 import os
+import time
 import requests
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
+
+
+# =============================================================================
+# Exact-Query Cache for X Search Results
+# =============================================================================
+# Simple in-memory cache with TTL to avoid redundant API calls for identical queries.
+# Only exact query+context matches hit cache (no fuzzy matching for safety).
+
+_SEARCH_CACHE: Dict[str, Tuple[str, float]] = {}
+_CACHE_TTL_SECONDS = 300  # 5 minutes
+
+
+def _cache_key(query: str, context: str) -> str:
+    """Generate cache key from exact query and context."""
+    return f"{query}|{context}"
+
+
+def _get_cached(query: str, context: str) -> Optional[str]:
+    """Get cached result if exists and not expired."""
+    key = _cache_key(query, context)
+    if key in _SEARCH_CACHE:
+        result, timestamp = _SEARCH_CACHE[key]
+        if time.time() - timestamp < _CACHE_TTL_SECONDS:
+            return result
+        else:
+            del _SEARCH_CACHE[key]  # Expired
+    return None
+
+
+def _set_cache(query: str, context: str, result: str):
+    """Cache result for exact query."""
+    key = _cache_key(query, context)
+    _SEARCH_CACHE[key] = (result, time.time())
 
 
 class XSearchClient:
@@ -61,7 +95,7 @@ class XSearchClient:
                     f"{self.base_url}/responses",
                     headers=self.headers,
                     json=payload,
-                    timeout=20  # Reduced from 60s to avoid long waits
+                    timeout=45  # Increased for xAI API reliability
                 )
                 response.raise_for_status()
                 return response.json()
@@ -120,22 +154,27 @@ class XSearchClient:
         Returns:
             Grok's response with X/Twitter insights and citations
         """
+        # Check cache first
+        cached = _get_cached(query, context)
+        if cached:
+            return cached
+        
         messages = [
             {
                 "role": "system",
-                "content": f"""You are a sports betting research assistant. Search X/Twitter for the most recent and relevant posts.
+                "content": f"""You are a sports betting research assistant. Search X/Twitter for the most recent and relevant posts FROM THE LAST 24 HOURS ONLY.
 
-Focus on:
+Focus on HIGH-VALUE actionable intel:
 - Breaking news from verified accounts (team accounts, beat reporters, insiders)
-- Injury updates and practice reports
+- Injury updates and practice reports with lineup implications
 - Weather conditions for outdoor games
-- Line movement discussions from sharp bettors
-- Any information that could affect betting lines
+- Sharp money/line movement from known cappers
+
+PRIORITIZE: Verified sources, breaking news, injury confirmations. SKIP: Fan speculation, old news, general discussion.
 
 Context: {context}
 
-Provide a concise summary highlighting actionable intel for betting purposes.
-Include source attribution when available."""
+Provide a CONCISE summary (max 3-5 bullet points) of actionable intel only. Include source attribution."""
             },
             {
                 "role": "user",
@@ -155,6 +194,10 @@ Include source attribution when available."""
             
             if citations:
                 text += "\n\n**Sources:**\n" + "\n".join(f"- {url}" for url in citations[:5])
+            
+            # Cache successful result
+            if not text.startswith("X search error"):
+                _set_cache(query, context, text)
             
             return text
         except requests.exceptions.HTTPError as e:
@@ -209,12 +252,21 @@ Provide a concise summary highlighting:
         except Exception as e:
             return f"Search error: {e}"
     
-    def get_injury_report(self, team: str) -> str:
-        """Get latest injury news for a specific team from X."""
-        return self.search(
-            f"{team} injury report practice status",
-            context=f"Looking for {team} injury updates that could affect betting lines"
-        )
+    def get_injury_report(self, team: str, sport: str = None) -> str:
+        """Get latest injury news for a specific team from X.
+        
+        Args:
+            team: Team name or abbreviation
+            sport: Sport context (NHL, NBA, NFL, MLB) for disambiguation
+        """
+        if sport:
+            query = f"{sport} {team} injury report practice status"
+            context = f"Looking for {sport} {team} injury updates that could affect betting lines"
+        else:
+            query = f"{team} injury report practice status"
+            context = f"Looking for {team} injury updates that could affect betting lines"
+        
+        return self.search(query, context)
     
     def get_weather_update(self, teams: str) -> str:
         """Get weather conditions for an outdoor game."""
