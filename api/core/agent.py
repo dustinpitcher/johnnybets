@@ -957,8 +957,10 @@ Your capabilities:
 - Flag rumors explicitly - When mentioning trade rumors, always prefix with "rumored" or "speculated" and note the player's CURRENT team.
 
 ## Current Session
+- Current date: {current_date}
+- Current time: {current_time}
 - Session started: {session_time}
-- Timezone: UTC
+- Note: All game times from the Odds API are in UTC, convert to ET for users
 """
 
 
@@ -1059,9 +1061,20 @@ class ChatSession:
         return [tc.get("name", "") for tc in self.last_tool_calls]
     
     def __post_init__(self):
-        # Initialize with system prompt
-        session_time = self.created_at.strftime('%Y-%m-%d %H:%M:%S UTC')
-        system_prompt = SYSTEM_PROMPT.format(session_time=session_time)
+        # Initialize with system prompt using Eastern time
+        from zoneinfo import ZoneInfo
+        eastern = ZoneInfo("America/New_York")
+        now_eastern = datetime.now(eastern)
+        
+        current_date = now_eastern.strftime('%A, %B %d, %Y')  # e.g., "Thursday, January 29, 2026"
+        current_time = now_eastern.strftime('%I:%M %p ET')     # e.g., "06:45 PM ET"
+        session_time = now_eastern.strftime('%Y-%m-%d %H:%M:%S ET')
+        
+        system_prompt = SYSTEM_PROMPT.format(
+            current_date=current_date,
+            current_time=current_time,
+            session_time=session_time
+        )
         self.messages = [SystemMessage(content=system_prompt)]
         
         # Create agent and capture actual model used (for trace logging)
