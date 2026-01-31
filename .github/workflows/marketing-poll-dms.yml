@@ -1,0 +1,74 @@
+name: Marketing Poll X DMs
+
+on:
+  schedule:
+    # Poll every 4 hours
+    # 0:00, 4:00, 8:00, 12:00, 16:00, 20:00 UTC
+    - cron: '0 0,4,8,12,16,20 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run against'
+        required: false
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - staging
+
+env:
+  API_URL_PROD: https://api.johnnybets.ai
+  API_URL_STAGING: https://ca-jbet-api-stg-eus2.blueplant-0e5d4fc7.eastus2.azurecontainerapps.io
+
+jobs:
+  poll-dms:
+    name: Poll X DMs
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
+    steps:
+      - name: Determine API URL
+        id: api
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "url=${{ env.API_URL_STAGING }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=${{ env.API_URL_PROD }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Poll X DMs
+        id: poll
+        run: |
+          echo "Checking X DMs..."
+          echo "API URL: ${{ steps.api.outputs.url }}"
+          
+          RESPONSE=$(curl -sf -X POST \
+            "${{ steps.api.outputs.url }}/api/marketing/poll/dms" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${{ secrets.MARKETING_API_KEY }}" \
+            -w "\n%{http_code}" \
+            --max-time 120)
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Poll failed with status $HTTP_CODE"
+            echo "$BODY"
+            exit 1
+          fi
+          
+          TOOLS=$(echo "$BODY" | jq -r '.tools_used | join(", ")')
+          echo "tools=$TOOLS" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "## X DMs Polled" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Tools Used | ${{ steps.poll.outputs.tools }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Time | $(date -u) |" >> $GITHUB_STEP_SUMMARY
