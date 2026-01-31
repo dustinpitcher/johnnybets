@@ -36,3 +36,6 @@ nba_api>=1.5.0
 
 # Azure Storage (for conversation trace logging)
 azure-storage-blob>=12.19.0
+
+# Database (for user segments in marketing agent)
+asyncpg>=0.29.0
