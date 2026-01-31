@@ -1,0 +1,88 @@
+name: Marketing Daily Content
+
+on:
+  schedule:
+    # Run at 10 AM ET (15:00 UTC, or 14:00 during DST)
+    # Using 15:00 UTC which is 10 AM EST / 11 AM EDT
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run against'
+        required: false
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - staging
+
+env:
+  API_URL_PROD: https://api.johnnybets.ai
+  API_URL_STAGING: https://ca-jbet-api-stg-eus2.blueplant-0e5d4fc7.eastus2.azurecontainerapps.io
+
+jobs:
+  generate-content:
+    name: Generate Daily Content
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
+    steps:
+      - name: Determine API URL
+        id: api
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "url=${{ env.API_URL_STAGING }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=${{ env.API_URL_PROD }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Daily Content
+        id: generate
+        run: |
+          echo "Generating daily marketing content..."
+          echo "API URL: ${{ steps.api.outputs.url }}"
+          
+          RESPONSE=$(curl -sf -X POST \
+            "${{ steps.api.outputs.url }}/api/marketing/scheduled/daily-content" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${{ secrets.MARKETING_API_KEY }}" \
+            -w "\n%{http_code}" \
+            --max-time 180)
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Generation failed with status $HTTP_CODE"
+            exit 1
+          fi
+          
+          DAY=$(echo "$BODY" | jq -r '.day')
+          DATE=$(echo "$BODY" | jq -r '.date')
+          TOOLS=$(echo "$BODY" | jq -r '.tools_used | join(", ")')
+          
+          echo "day=$DAY" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+          echo "tools=$TOOLS" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "## Daily Content Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Day | ${{ steps.generate.outputs.day }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Date | ${{ steps.generate.outputs.date }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tools Used | ${{ steps.generate.outputs.tools }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ github.event.inputs.environment || 'prod' }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Failure Notification
+        if: failure()
+        run: |
+          echo "## Daily Content Generation Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs for details." >> $GITHUB_STEP_SUMMARY
