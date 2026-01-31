@@ -508,6 +508,15 @@ class NBADataFetcher:
         
         row = team_row.iloc[0]
         pace = float(row.get('PACE', 100))
+        off_rating = float(row.get('OFF_RATING', 110))
+        def_rating = float(row.get('DEF_RATING', 110))
+        
+        # Calculate pts/game from ratings and pace
+        # Advanced stats don't include raw PTS, so we derive from:
+        # PTS/game ≈ OFF_RATING * (PACE / 100)
+        # OPP_PTS/game ≈ DEF_RATING * (PACE / 100)
+        pts_per_game = off_rating * (pace / 100)
+        opp_pts_per_game = def_rating * (pace / 100)
         
         # Find pace rank
         pace_rank = 1
@@ -521,10 +530,10 @@ class NBADataFetcher:
             team_id=team_id,
             pace=pace,
             pace_rank=pace_rank,
-            off_rating=float(row.get('OFF_RATING', 110)),
-            def_rating=float(row.get('DEF_RATING', 110)),
-            pts_per_game=float(row.get('PTS', 110)),
-            opp_pts_per_game=float(row.get('OPP_PTS', 110)),
+            off_rating=off_rating,
+            def_rating=def_rating,
+            pts_per_game=round(pts_per_game, 1),
+            opp_pts_per_game=round(opp_pts_per_game, 1),
             pace_adjustment=round(pace - self.LEAGUE_AVG_PACE, 1),
         )
         

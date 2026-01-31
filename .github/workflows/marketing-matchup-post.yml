@@ -1,0 +1,105 @@
+name: Marketing Matchup Post
+
+on:
+  # Allow manual triggering with league filter
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run against'
+        required: false
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - staging
+      league:
+        description: 'League filter (leave empty for auto-select)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - NFL
+          - NBA
+          - NHL
+          - MLB
+
+env:
+  API_URL_PROD: https://api.johnnybets.ai
+  API_URL_STAGING: https://ca-jbet-api-stg-eus2.blueplant-0e5d4fc7.eastus2.azurecontainerapps.io
+
+jobs:
+  matchup-post:
+    name: Generate Matchup Post
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    
+    steps:
+      - name: Determine API URL
+        id: api
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "url=${{ env.API_URL_STAGING }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=${{ env.API_URL_PROD }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Matchup Post
+        id: generate
+        run: |
+          echo "Generating matchup post..."
+          echo "API URL: ${{ steps.api.outputs.url }}"
+          echo "League: ${{ github.event.inputs.league || 'auto' }}"
+          
+          # Build request body
+          if [ -n "${{ github.event.inputs.league }}" ]; then
+            BODY='{"league": "${{ github.event.inputs.league }}"}'
+          else
+            BODY='{}'
+          fi
+          
+          RESPONSE=$(curl -sf -X POST \
+            "${{ steps.api.outputs.url }}/api/marketing/scheduled/matchup-post" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${{ secrets.MARKETING_API_KEY }}" \
+            -d "$BODY" \
+            -w "\n%{http_code}" \
+            --max-time 300)
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Generation failed with status $HTTP_CODE"
+            exit 1
+          fi
+          
+          LEAGUE=$(echo "$BODY" | jq -r '.league')
+          TOOLS=$(echo "$BODY" | jq -r '.tools_used | join(", ")')
+          TIMESTAMP=$(echo "$BODY" | jq -r '.timestamp')
+          
+          echo "league=$LEAGUE" >> $GITHUB_OUTPUT
+          echo "tools=$TOOLS" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "## Matchup Post Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| League | ${{ steps.generate.outputs.league }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timestamp | ${{ steps.generate.outputs.timestamp }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tools Used | ${{ steps.generate.outputs.tools }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ github.event.inputs.environment || 'prod' }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Failure Notification
+        if: failure()
+        run: |
+          echo "## Matchup Post Generation Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs for details." >> $GITHUB_STEP_SUMMARY

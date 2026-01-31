@@ -445,6 +445,11 @@ DAILY_CONTENT_PROMPTS = {
 }
 
 
+class MatchupPostRequest(BaseModel):
+    """Request for matchup post generation."""
+    league: Optional[str] = None  # NFL, NBA, NHL, MLB - or None for auto-select
+
+
 @router.post("/scheduled/daily-content")
 async def generate_daily_content(
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
@@ -473,6 +478,54 @@ async def generate_daily_content(
         "day": now.strftime("%A"),
         "date": now.strftime("%Y-%m-%d"),
         "prompt": prompt,
+        "response": response,
+        "tools_used": session.last_tools_used,
+    }
+
+
+@router.post("/scheduled/matchup-post")
+async def generate_matchup_post(
+    request: MatchupPostRequest = None,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+):
+    """
+    Generate and post a matchup promo with image for the next featured game.
+    
+    Called by GitHub Actions or manually triggered.
+    Automatically selects the most interesting upcoming game and creates
+    a promotional post with a generated image.
+    
+    Args:
+        request: Optional league filter (NFL, NBA, NHL, MLB)
+    """
+    await verify_api_key(x_api_key)
+    
+    if request is None:
+        request = MatchupPostRequest()
+    
+    league_filter = f" for {request.league}" if request.league else ""
+    
+    prompt = f"""Create an X post about the next featured game{league_filter}.
+
+Steps:
+1. Use get_next_featured_game to find the most interesting upcoming game
+2. Generate a promo image using the 'hype' style with the matchup details (teams, spread, o/u, key context)
+3. Post to X with the image attached
+
+Keep the tweet text concise: teams, key number (spread or total), one insight, and bet responsibly."""
+    
+    session = create_marketing_session()
+    response = await session.chat(prompt)
+    
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    eastern = ZoneInfo("America/New_York")
+    now = datetime.now(eastern)
+    
+    return {
+        "status": "success",
+        "timestamp": now.isoformat(),
+        "league": request.league or "auto",
         "response": response,
         "tools_used": session.last_tools_used,
     }

@@ -31,6 +31,8 @@ load_dotenv()
 from api.core.graph_email import get_graph_email_client, GraphAPIError
 from api.core.x_posting import get_x_posting_client, XAPIError
 from api.core.user_segments import get_user_segments_client
+from api.core.xai_media import get_media_client, XAIMediaError
+from api.core.x_media_upload import get_x_media_upload_client, XMediaUploadError
 
 
 # =============================================================================
@@ -75,6 +77,47 @@ async def ask_johnny(question: str) -> str:
         return json.dumps({
             "status": "error",
             "error": f"Failed to query Johnny: {str(e)}",
+        })
+
+
+@tool
+async def get_next_featured_game(league: str = None) -> str:
+    """
+    Get the next featured game for marketing content across NFL, NBA, NHL, or MLB.
+    
+    This queries Johnny for the next scheduled game with the most betting interest
+    (based on market activity, line movement, or matchup significance).
+    
+    Use this to automatically select which game to feature in a post.
+    
+    Args:
+        league: Optional league filter ("NFL", "NBA", "NHL", "MLB"). 
+                If not specified, returns the most interesting game across all active leagues.
+        
+    Returns:
+        JSON with matchup info: teams, spread, total, game time, key context
+    """
+    try:
+        from api.core.agent import ChatSession
+        
+        if league:
+            query = f"What is the next {league} game? Give me the teams, spread, total (o/u), game time (ET), and a brief one-sentence reason why this game is interesting. Format: AWAY @ HOME, Spread: X, O/U: X, Time: X, Why: X"
+        else:
+            query = "What is the most interesting game coming up today or tomorrow across NFL, NBA, NHL? Pick ONE game with the most betting interest. Give me the league, teams, spread, total (o/u), game time (ET), and why it's interesting. Format: League: X, AWAY @ HOME, Spread: X, O/U: X, Time: X, Why: X"
+        
+        session = ChatSession()
+        response = await session.chat(query)
+        
+        return json.dumps({
+            "status": "success",
+            "league": league or "auto",
+            "matchup_info": response,
+        }, indent=2, default=str)
+        
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "error": f"Failed to get next game: {str(e)}",
         })
 
 
@@ -411,6 +454,171 @@ async def reply_to_x_mention(tweet_id: str, text: str) -> str:
         return json.dumps({"status": "error", "error": str(e)})
 
 
+# =============================================================================
+# MEDIA GENERATION TOOLS
+# =============================================================================
+
+@tool
+async def generate_promo_image(
+    prompt: str,
+    style: str = "matchup",
+    aspect_ratio: str = "16:9",
+) -> str:
+    """
+    Generate a promotional image using Gemini 3 Pro.
+    
+    Use this to create graphics for X posts, emails, or other marketing content.
+    The image will be automatically stored and a path returned.
+    
+    IMPORTANT: Use the returned "stored_path" when calling post_to_x_with_media.
+    
+    Args:
+        prompt: Description of the image. Include team names, stats with labels 
+            (e.g., "SPREAD: DEN -6.5", "EDGE: 72%"), and team colors.
+        style: Style preset - one of:
+            - "matchup": Bold diagonal color clash, giant typography (DEFAULT)
+            - "hype": Athletic campaign aesthetic, motion streaks
+            - "terminal": ASCII art logos, monospace, team colors
+            - "stats": Clean stat card layout
+            - "promo": Dynamic motion, animated stats
+        aspect_ratio: Image aspect ratio (default "16:9" for social media)
+        
+    Returns:
+        JSON with stored_path (use this for post_to_x_with_media)
+    """
+    try:
+        client = get_media_client()
+        result = await client.generate_image(
+            prompt=prompt,
+            style=style,
+            aspect_ratio=aspect_ratio,
+            include_branding=True,
+            store=True,
+        )
+        
+        return json.dumps({
+            "status": "success",
+            "url": result.get("url"),
+            "stored_path": result.get("stored_path"),
+            "revised_prompt": result.get("revised_prompt"),
+        }, indent=2)
+        
+    except XAIMediaError as e:
+        return json.dumps({"status": "error", "error": f"xAI Media error: {e.message}"})
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
+
+
+@tool
+async def generate_promo_video(
+    prompt: str,
+    style: str = "promo",
+    duration: int = 6,
+    aspect_ratio: str = "16:9",
+) -> str:
+    """
+    Generate a promotional video using xAI's Grok Imagine API.
+    
+    Use this to create video content for X posts. Videos can be up to 15 seconds.
+    Generation takes 30-60 seconds. The video will be stored and a URL returned.
+    
+    For best results, describe the motion: "stats scroll up one by one", 
+    "typography slams in with motion blur", "colors collide diagonally".
+    
+    Args:
+        prompt: Description with motion. Include: team matchup, stats with labels
+            that scroll/animate (SPREAD, EDGE, TREND), and ending with branding.
+            Example: "Lakers vs Nuggets. Purple gold collides with navy. LAL VS DEN 
+            flies in. Stats scroll: SPREAD DEN -6.5, EDGE 72%. Ends with JohnnyBets logo."
+        style: Style preset - "promo" (default for video), "matchup", "hype", "terminal"
+        duration: Video length in seconds (1-15, default 6). Use 10+ for scrolling stats.
+        aspect_ratio: Video aspect ratio (default "16:9")
+        
+    Returns:
+        JSON string with video URL and storage path
+    """
+    try:
+        client = get_media_client()
+        result = await client.generate_video(
+            prompt=prompt,
+            style=style,
+            duration=duration,
+            aspect_ratio=aspect_ratio,
+            resolution="720p",
+            include_branding=True,
+            store=True,
+        )
+        
+        return json.dumps({
+            "status": "success",
+            "url": result.get("url"),
+            "stored_path": result.get("stored_path"),
+            "duration": result.get("duration"),
+            "request_id": result.get("request_id"),
+        }, indent=2)
+        
+    except XAIMediaError as e:
+        return json.dumps({"status": "error", "error": f"xAI Media error: {e.message}"})
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
+
+
+@tool
+async def post_to_x_with_media(
+    text: str,
+    media_path: str,
+    reply_to: str = None,
+) -> str:
+    """
+    Post a tweet with an attached image or video to the @JohnnyBetsAI X account.
+    
+    Use this after generating a promo image or video to post it with text.
+    The media will be uploaded to X and attached to the tweet.
+    
+    Args:
+        text: Tweet text (max 280 characters)
+        media_path: Path to the image or video file (from generate_promo_image/video stored_path)
+        reply_to: Optional tweet ID to reply to
+        
+    Returns:
+        JSON string with tweet ID and URL
+    """
+    try:
+        upload_client = get_x_media_upload_client()
+        
+        # Detect if it's a local file path or a URL
+        if media_path.startswith("http://") or media_path.startswith("https://"):
+            media_id = await upload_client.upload_from_url(media_path)
+        else:
+            # Local file path
+            media_id = await upload_client.upload_from_file(media_path)
+        
+        # Then post the tweet with the media attached
+        posting_client = get_x_posting_client()
+        result = await posting_client.post_tweet(
+            text=text,
+            reply_to=reply_to,
+            media_ids=[media_id],
+        )
+        
+        return json.dumps({
+            "status": "success",
+            "media_id": media_id,
+            **result,
+        }, indent=2)
+        
+    except XMediaUploadError as e:
+        return json.dumps({"status": "error", "error": f"Media upload error: {e.message}"})
+    except XAPIError as e:
+        return json.dumps({"status": "error", "error": f"X API error: {e.message}"})
+    except FileNotFoundError as e:
+        return json.dumps({"status": "error", "error": f"Media file not found: {media_path}"})
+    except ValueError as e:
+        return json.dumps({"status": "error", "error": str(e)})
+    except Exception as e:
+        return json.dumps({"status": "error", "error": str(e)})
+
+
 @tool
 async def get_user_segments() -> str:
     """
@@ -611,6 +819,7 @@ def get_marketing_tools():
     return [
         # Johnny query - get betting context
         ask_johnny,
+        get_next_featured_game,
         # Email tools
         read_inbox,
         get_email_detail,
@@ -623,6 +832,10 @@ def get_marketing_tools():
         get_x_mentions,
         get_x_dms,
         reply_to_x_mention,
+        # Media generation tools
+        generate_promo_image,
+        generate_promo_video,
+        post_to_x_with_media,
         # User targeting
         get_user_segments,
         get_users_in_segment,

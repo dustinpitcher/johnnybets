@@ -173,6 +173,7 @@ class XPostingClient:
         text: str,
         reply_to: Optional[str] = None,
         quote_tweet_id: Optional[str] = None,
+        media_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Post a new tweet.
@@ -181,6 +182,7 @@ class XPostingClient:
             text: Tweet text (max 280 characters)
             reply_to: Optional tweet ID to reply to
             quote_tweet_id: Optional tweet ID to quote
+            media_ids: Optional list of media IDs to attach (from media upload)
             
         Returns:
             Dictionary with tweet ID and text
@@ -195,6 +197,9 @@ class XPostingClient:
         
         if quote_tweet_id:
             payload["quote_tweet_id"] = quote_tweet_id
+        
+        if media_ids:
+            payload["media"] = {"media_ids": media_ids}
         
         result = await self._make_request("POST", "/tweets", json_data=payload)
         
