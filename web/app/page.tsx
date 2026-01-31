@@ -286,7 +286,9 @@ function HomeContent() {
           <span>100% Free • No limits • All tools included</span>
           <div className="flex items-center gap-4">
             <a href="/tools" className="hover:text-terminal-accent">Tools</a>
-            <a href="https://twitter.com/johnnybets" className="hover:text-terminal-accent">@johnnybets</a>
+            <a href="/terms" className="hover:text-terminal-accent">Terms</a>
+            <a href="/privacy" className="hover:text-terminal-accent">Privacy</a>
+            <a href="https://x.com/johnnybets_ai" className="hover:text-terminal-accent" target="_blank" rel="noopener noreferrer">@johnnybets_ai</a>
           </div>
         </div>
       </footer>
