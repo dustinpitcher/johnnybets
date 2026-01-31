@@ -203,11 +203,14 @@ class XPostingClient:
         
         result = await self._make_request("POST", "/tweets", json_data=payload)
         
+        tweet_id = result.get("data", {}).get("id")
+        print(f"[XPosting] Tweet posted: {tweet_id}")
+        
         return {
             "status": "success",
-            "tweet_id": result.get("data", {}).get("id"),
+            "tweet_id": tweet_id,
             "text": result.get("data", {}).get("text"),
-            "url": f"https://x.com/i/web/status/{result.get('data', {}).get('id')}",
+            "url": f"https://x.com/i/web/status/{tweet_id}",
         }
     
     async def delete_tweet(self, tweet_id: str) -> Dict[str, Any]:
