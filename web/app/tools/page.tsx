@@ -233,8 +233,13 @@ export default function ToolsPage() {
             All free tools are available now. Premium tools coming soon.
           </p>
           <p className="text-xs text-terminal-muted mt-2">
-            Have an idea for a new tool? <a href="#" className="text-terminal-accent hover:underline">Let us know!</a>
+            Have an idea for a new tool? <a href="mailto:mail@johnnybets.ai" className="text-terminal-accent hover:underline">Let us know!</a>
           </p>
+          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-terminal-muted">
+            <a href="/terms" className="hover:text-terminal-accent">Terms</a>
+            <a href="/privacy" className="hover:text-terminal-accent">Privacy</a>
+            <a href="https://x.com/johnnybets_ai" className="hover:text-terminal-accent" target="_blank" rel="noopener noreferrer">@johnnybets_ai</a>
+          </div>
         </div>
       </footer>
     </div>
