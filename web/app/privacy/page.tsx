@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen bg-terminal-bg text-terminal-text">
@@ -228,7 +230,7 @@ export default function PrivacyPolicy() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-terminal-border">
-          <a href="/" className="text-terminal-accent hover:underline">&larr; Back to JohnnyBets</a>
+          <Link href="/" className="text-terminal-accent hover:underline">&larr; Back to JohnnyBets</Link>
         </div>
       </div>
     </div>
